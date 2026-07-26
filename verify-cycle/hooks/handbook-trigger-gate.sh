@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# PreToolUse hook (Bash matching 'git commit'): enforces contract §21's
+# handbook-trigger half. When a commit's changed-file set introduces or changes
+# an operational surface (env/config/dependency/migration/run-setup-deploy) but
+# does not also touch a docs/handbooks/<component>.md, the commit is refused.
+#
+# It needs the whole staged changed-file set at once, so it fires at commit
+# time, not on a single Write. Peer sibling to state-gate.sh; never edits it.
+#
+# Operational-surface path heuristics (verify's declared list): dependency
+# manifests (package.json, pyproject.toml, requirements*.txt, go.mod, Cargo.toml,
+# Gemfile), container/build (Dockerfile, docker-compose*), env examples
+# (*.env, *.env.example, .env*), migration dirs (**/migrations/**), CI/deploy
+# workflows (.github/workflows/**, deploy/**), and run/setup scripts
+# (install.sh, setup.sh, run.sh, Makefile).
+#
+# FAIL-CLOSED: unparseable JSON, non-dict event/tool_input, or a commit whose
+# staged file set cannot be read (git failure) all DENY (exit 2). A Bash call
+# that is not a git commit passes through.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=/dev/null
+. "$HERE/_gate-common.sh"
+
+command -v python3 >/dev/null 2>&1 || {
+  echo "verify-cycle: refused — handbook-trigger-gate.sh requires python3, which is not on PATH; denying rather than guessing." >&2
+  exit 2
+}
+
+payload="$(cat 2>/dev/null || true)"
+
+command_str="$(printf '%s' "$payload" | python3 -c '
+import json,sys
+try:
+    e=json.loads(sys.stdin.read())
+except Exception:
+    print("__MALFORMED__"); sys.exit(0)
+if not isinstance(e,dict):
+    print("__MALFORMED__"); sys.exit(0)
+if e.get("tool_name")!="Bash":
+    sys.exit(0)
+ti=e.get("tool_input")
+if not isinstance(ti,dict):
+    print("__MALFORMED__"); sys.exit(0)
+c=ti.get("command")
+print(c if isinstance(c,str) else "")
+' 2>/dev/null || printf '__MALFORMED__')"
+
+if [ "$command_str" = "__MALFORMED__" ]; then
+  echo "verify-cycle: refused — handbook-trigger-gate.sh could not parse the tool-call payload; denying rather than guessing." >&2
+  exit 2
+fi
+# Not a Bash tool call, or not a git commit -> not this gate's business.
+case "$command_str" in
+  *"git commit"*|*"git"*" commit"*) : ;;
+  *) exit 0 ;;
+esac
+
+root="$(resolve_root "")"
+if [ -z "$root" ]; then
+  echo "verify-cycle: refused — handbook-trigger-gate.sh could not determine the project root for this commit; denying rather than guessing." >&2
+  exit 2
+fi
+
+# Staged changed-file set.
+if ! staged="$(git -C "$root" diff --cached --name-only 2>/dev/null)"; then
+  echo "verify-cycle: refused — could not read the staged file set (git diff --cached failed) for this commit; denying rather than guessing." >&2
+  exit 2
+fi
+
+VG_STAGED="$staged" python3 <<'PY'
+import os, re, sys, posixpath
+
+def deny(m):
+    sys.stderr.write("verify-cycle: refused — " + m + "\n"); sys.exit(2)
+
+files = [f for f in os.environ.get("VG_STAGED", "").splitlines() if f.strip()]
+if not files:
+    # Nothing staged -> nothing to enforce here.
+    sys.exit(0)
+
+def is_op_surface(p):
+    base = posixpath.basename(p)
+    if base in ("package.json", "pyproject.toml", "go.mod", "Cargo.toml",
+                "Gemfile", "Dockerfile", "Makefile", "install.sh", "setup.sh", "run.sh"):
+        return base
+    if re.match(r'requirements.*\.txt$', base):
+        return base
+    if base.startswith("docker-compose"):
+        return base
+    if base.endswith(".env") or base.endswith(".env.example") or base.startswith(".env"):
+        return base
+    parts = p.split("/")
+    if "migrations" in parts:
+        return "migration (%s)" % p
+    if p.startswith(".github/workflows/") or p.startswith("deploy/"):
+        return "ci/deploy (%s)" % p
+    return None
+
+triggers = [(f, is_op_surface(f)) for f in files]
+triggers = [(f, k) for (f, k) in triggers if k]
+if not triggers:
+    sys.exit(0)
+
+touches_handbook = any(f.startswith("docs/handbooks/") for f in files)
+if touches_handbook:
+    sys.exit(0)
+
+f, k = triggers[0]
+deny("this commit changes %s (operational surface: %s) but does not touch any "
+     "docs/handbooks/<component>.md. Per contract §21, update the component's handbook in the "
+     "same unit of work." % (f, k))
+PY
