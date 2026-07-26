@@ -543,6 +543,25 @@ fi
 
 cleanup_scratch
 
+# --- (s) fail-closed on internal error: a null byte in tool_input.file_path
+# makes os.path.realpath raise ValueError. An uncaught ValueError would exit 1,
+# which Claude Code PreToolUse treats as NON-blocking (fail-open); the gate must
+# instead resolve to exit 2 (DENY). The ` ` below is a literal 6-char JSON
+# escape that json.loads decodes into an embedded null byte.
+# (docs/proposals/2026-07-26-gates-fail-closed-on-internal-error.md)
+root="$(new_root)"
+write_state "$root" "idle"
+payload_s="{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$root/docs/reports/records/x\\u0000y/verify.md\",\"content\":\"status: reproducing\\n\"}}"
+out_s="$(run_gate "$root" "$payload_s" 2>&1)"
+rc_s=$?
+if [ "$rc_s" -eq 2 ]; then
+  echo "PASS: (s) null-byte file_path fails closed to exit 2 (DENY), not fail-open"
+  pass=$((pass+1))
+else
+  echo "FAIL: (s) null-byte file_path — expected exit 2 (DENY), got exit $rc_s. Output: $out_s"
+  fail=$((fail+1))
+fi
+
 echo
 echo "== $pass passed, $fail failed =="
 [ "$fail" -eq 0 ]

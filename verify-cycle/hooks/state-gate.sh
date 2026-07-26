@@ -164,12 +164,23 @@ if [ -z "$root" ]; then
   exit 2
 fi
 
-VERIFY_GATE_PAYLOAD="$payload" VERIFY_GATE_ROOT="$root" VERIFY_GATE_STATE_NAME="$state_name" VERIFY_GATE_RULES_FILE="$rules_file" python3 <<'PY'
+_grc=0
+VERIFY_GATE_PAYLOAD="$payload" VERIFY_GATE_ROOT="$root" VERIFY_GATE_STATE_NAME="$state_name" VERIFY_GATE_RULES_FILE="$rules_file" python3 <<'PY' || _grc=$?
 import json
 import os
 import posixpath
 import re
 import sys
+
+# FAIL-CLOSED (python layer): any uncaught internal error (e.g. a ValueError
+# from os.path.realpath on a null-byte or undecodable path) becomes a DENY
+# (exit 2), never an uncaught exit 1 (which Claude Code treats as NON-blocking =
+# fail-open). SystemExit is not routed through excepthook, so the deliberate
+# allow(0) / refuse(2) verdict paths below are preserved exactly.
+def _fail_closed(_t, _v, _tb):
+    sys.stderr.write("verify-cycle: refused — fail-closed: internal error: %s\n" % (_v,))
+    os._exit(2)
+sys.excepthook = _fail_closed
 
 def allow(reason=""):
     if reason:
@@ -753,4 +764,12 @@ else:
     )
 PY
 
-exit $?
+# FAIL-CLOSED (shell layer): the python judge above is the allow/deny authority.
+# Map ANY terminal code that is neither 0 (allow) nor 2 (deny) to a deny — a
+# crash that aborted python, or 'set -e' propagating a bare non-2 code, must
+# never leave the guarded tool call non-blocking (fail-open).
+if [ "$_grc" -ne 0 ] && [ "$_grc" -ne 2 ]; then
+  echo "verify-cycle: refused — fail-closed: internal error (gate judge exited $_grc). Refusing rather than allowing an uninspectable action." >&2
+  exit 2
+fi
+exit "$_grc"

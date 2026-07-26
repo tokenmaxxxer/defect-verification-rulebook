@@ -50,8 +50,19 @@ if [ -n "$root" ]; then
   current_sha="$(git -C "$root" rev-parse HEAD 2>/dev/null || true)"
 fi
 
-VG_PAYLOAD="$payload" VG_ROOT="$root" VG_SHA="$current_sha" python3 <<'PY'
+_grc=0
+VG_PAYLOAD="$payload" VG_ROOT="$root" VG_SHA="$current_sha" python3 <<'PY' || _grc=$?
 import json, os, posixpath, re, sys
+
+# FAIL-CLOSED (python layer): any uncaught internal error (e.g. a ValueError
+# from os.path.realpath on a null-byte or undecodable path) must become a DENY
+# (exit 2), never an uncaught exit 1 (which Claude Code treats as non-blocking =
+# fail-open). SystemExit is not routed here, so the deliberate allow(0)/deny(2)
+# verdict paths below are preserved exactly.
+def _fail_closed(_t, _v, _tb):
+    sys.stderr.write("verify-cycle: refused — fail-closed: internal error: %s\n" % (_v,))
+    os._exit(2)
+sys.excepthook = _fail_closed
 
 def deny(m):
     sys.stderr.write("verify-cycle: refused — " + m + "\n"); sys.exit(2)
@@ -147,3 +158,13 @@ if bad:
 
 allow()
 PY
+
+# FAIL-CLOSED (shell layer): the judge above is the allow/deny authority. Map
+# ANY terminal code that is neither 0 (allow) nor 2 (deny) to a deny — a crash
+# that aborted python (or 'set -e' propagating a bare non-2 code) must never
+# leave the guarded tool call non-blocking.
+if [ "$_grc" -ne 0 ] && [ "$_grc" -ne 2 ]; then
+  echo "verify-cycle: refused — fail-closed: internal error (gate judge exited $_grc)." >&2
+  exit 2
+fi
+exit "$_grc"

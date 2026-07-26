@@ -18,10 +18,21 @@ command -v python3 >/dev/null 2>&1 || {
 
 payload="$(cat 2>/dev/null || true)"
 
-VG_PAYLOAD="$payload" python3 <<'PY'
+_grc=0
+VG_PAYLOAD="$payload" python3 <<'PY' || _grc=$?
 import json, os, posixpath, sys
 
 BUCKETS = ("decisions", "handbooks", "reports", "specs", "proposals", "_assets")
+
+# FAIL-CLOSED (python layer): any uncaught internal error (e.g. a ValueError
+# from os.path.realpath on a null-byte or undecodable path) becomes a DENY
+# (exit 2), never an uncaught exit 1 (which Claude Code treats as fail-open).
+# SystemExit is not routed here, so the allow(0)/deny(2) verdict paths below are
+# preserved exactly.
+def _fail_closed(_t, _v, _tb):
+    sys.stderr.write("verify-cycle: refused — fail-closed: internal error: %s\n" % (_v,))
+    os._exit(2)
+sys.excepthook = _fail_closed
 
 def deny(m):
     sys.stderr.write("verify-cycle: refused — " + m + "\n"); sys.exit(2)
@@ -93,3 +104,12 @@ if sub in BUCKETS:
 deny("'%s' is under docs/ but not in one of the six buckets (it starts docs/%s/...). The "
      "buckets are: %s." % (rel, sub, ", ".join(b + "/" for b in BUCKETS)))
 PY
+
+# FAIL-CLOSED (shell layer): map ANY terminal code that is neither 0 (allow)
+# nor 2 (deny) to a deny, so a crash or 'set -e' propagating a bare non-2 code
+# never leaves the guarded tool call non-blocking.
+if [ "$_grc" -ne 0 ] && [ "$_grc" -ne 2 ]; then
+  echo "verify-cycle: refused — fail-closed: internal error (gate judge exited $_grc)." >&2
+  exit 2
+fi
+exit "$_grc"

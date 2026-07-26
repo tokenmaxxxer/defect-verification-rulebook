@@ -38,10 +38,21 @@ if isinstance(ti,dict):
 
 root="$(resolve_root "$_target")"
 
-VG_PAYLOAD="$payload" VG_ROOT="$root" python3 <<'PY'
+_grc=0
+VG_PAYLOAD="$payload" VG_ROOT="$root" python3 <<'PY' || _grc=$?
 import json, os, posixpath, re, sys
 
 OWN_ROLE_FILE = "verify.md"
+
+# FAIL-CLOSED (python layer): any uncaught internal error (e.g. a ValueError
+# from os.path.realpath on a null-byte or undecodable path) becomes a DENY
+# (exit 2), never an uncaught exit 1 (which Claude Code treats as fail-open).
+# SystemExit is not routed here, so the allow(0)/deny(2) verdict paths below are
+# preserved exactly.
+def _fail_closed(_t, _v, _tb):
+    sys.stderr.write("verify-cycle: refused — fail-closed: internal error: %s\n" % (_v,))
+    os._exit(2)
+sys.excepthook = _fail_closed
 
 def deny(m):
     sys.stderr.write("verify-cycle: refused — " + m + "\n"); sys.exit(2)
@@ -94,3 +105,12 @@ if role_file != OWN_ROLE_FILE:
 
 allow()
 PY
+
+# FAIL-CLOSED (shell layer): map ANY terminal code that is neither 0 (allow)
+# nor 2 (deny) to a deny, so a crash or 'set -e' propagating a bare non-2 code
+# never leaves the guarded tool call non-blocking.
+if [ "$_grc" -ne 0 ] && [ "$_grc" -ne 2 ]; then
+  echo "verify-cycle: refused — fail-closed: internal error (gate judge exited $_grc)." >&2
+  exit 2
+fi
+exit "$_grc"

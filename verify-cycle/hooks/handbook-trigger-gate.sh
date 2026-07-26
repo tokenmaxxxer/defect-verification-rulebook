@@ -69,8 +69,18 @@ if ! staged="$(git -C "$root" diff --cached --name-only 2>/dev/null)"; then
   exit 2
 fi
 
-VG_STAGED="$staged" python3 <<'PY'
+_grc=0
+VG_STAGED="$staged" python3 <<'PY' || _grc=$?
 import os, re, sys, posixpath
+
+# FAIL-CLOSED (python layer): any uncaught internal error becomes a DENY
+# (exit 2), never an uncaught exit 1 (which Claude Code treats as fail-open).
+# SystemExit is not routed here, so the deny(2) / pass(0) verdict paths below
+# are preserved exactly.
+def _fail_closed(_t, _v, _tb):
+    sys.stderr.write("verify-cycle: refused — fail-closed: internal error: %s\n" % (_v,))
+    os._exit(2)
+sys.excepthook = _fail_closed
 
 def deny(m):
     sys.stderr.write("verify-cycle: refused — " + m + "\n"); sys.exit(2)
@@ -112,3 +122,12 @@ deny("this commit changes %s (operational surface: %s) but does not touch any "
      "docs/handbooks/<component>.md. Per contract §21, update the component's handbook in the "
      "same unit of work." % (f, k))
 PY
+
+# FAIL-CLOSED (shell layer): map ANY terminal code that is neither 0 (pass) nor
+# 2 (deny) to a deny, so a crash or 'set -e' propagating a bare non-2 code never
+# leaves the guarded commit non-blocking.
+if [ "$_grc" -ne 0 ] && [ "$_grc" -ne 2 ]; then
+  echo "verify-cycle: refused — fail-closed: internal error (gate judge exited $_grc)." >&2
+  exit 2
+fi
+exit "$_grc"
