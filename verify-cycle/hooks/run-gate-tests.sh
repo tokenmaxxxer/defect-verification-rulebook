@@ -61,8 +61,16 @@ expect_allow() {
 }
 
 new_root() {
+  # A generated scratch root must itself be a plausible project root (per
+  # docs/proposals/2026-07-26-gate-root-from-project-dir.md's §2(a2)(ii))
+  # for CLAUDE_PROJECT_DIR=$root (as run_gate sets it) to validate — so
+  # every scratch root is its own throwaway git repo, with the minimal
+  # contract file Rule 0 requires (write_contract is idempotent/harmless
+  # for tests that also call it explicitly for §11 coverage).
   local d
   d="$(mktemp -d -p "$WORKDIR")"
+  git init -q "$d" >/dev/null 2>&1
+  write_contract "$d"
   echo "$d"
 }
 
@@ -236,27 +244,86 @@ JSON
 )
 expect_allow "(k) genuinely absent state file, (none)->idle bootstrap row allowed" "$root" "$payload"
 
-# --- (l) invoked from a cwd OUTSIDE the repo, CLAUDE_PROJECT_DIR unset ---
-# Root resolution must be anchored to the hook's own on-disk location, never
-# to the process cwd or CLAUDE_PROJECT_DIR. Run the SAME payload against the
-# real on-disk gate once from inside this repo's own checkout and once from
-# an unrelated outside directory, both with CLAUDE_PROJECT_DIR unset — the
-# two must reach the identical decision, proving the outside-cwd invocation
-# still resolved and judged this repo's own verify-record.md rather than
-# some other (or no) state file.
+# --- (l) CLAUDE_PROJECT_DIR unset: git-toplevel fallback -------------------
+# Per docs/proposals/2026-07-26-gate-root-from-project-dir.md §2(b): with
+# CLAUDE_PROJECT_DIR unset, root falls back to the git top-level of the
+# PreToolUse target path, else the git top-level of cwd.
 repo_root="$(cd "$HOOK_DIR/../.." && pwd -P)"
 outside_dir="$(mktemp -d)"
 payload_l='{"tool_name":"Write","tool_input":{"file_path":"verify-record.md","content":"status: idle\n"}}'
 out_in="$(cd "$repo_root" && env -u CLAUDE_PROJECT_DIR bash -c 'printf "%s" "$1" | bash "$2"' _ "$payload_l" "$GATE" 2>&1)"
 code_in=$?
+if [ "$code_in" -eq 0 ]; then
+  echo "PASS: (l1) CLAUDE_PROJECT_DIR unset, invoked inside this repo — falls back to this repo's own git top-level and enforces normally (exit 0)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (l1) CLAUDE_PROJECT_DIR unset, invoked inside this repo — expected exit 0 via git-toplevel fallback, got exit $code_in. Output: $out_in"
+  fail=$((fail+1))
+fi
+
+# (l2) CLAUDE_PROJECT_DIR unset, cwd AND target both outside any git
+# work-tree -> root is indeterminate -> refused (never silently allowed),
+# even though the target string looks like a legal bootstrap transition.
 out_out="$(cd "$outside_dir" && env -u CLAUDE_PROJECT_DIR bash -c 'printf "%s" "$1" | bash "$2"' _ "$payload_l" "$GATE" 2>&1)"
 code_out=$?
 rm -rf "$outside_dir"
-if [ "$code_in" -eq "$code_out" ]; then
-  echo "PASS: (l) invocation from outside the repo resolves the same repo root as invocation from inside it (exit $code_out matches exit $code_in)"
+if [ "$code_out" -ne 0 ]; then
+  echo "PASS: (l2) CLAUDE_PROJECT_DIR unset, cwd/target both outside any git work-tree — indeterminate root refused (exit $code_out)"
   pass=$((pass+1))
 else
-  echo "FAIL: (l) invocation from outside the repo (exit $code_out) diverged from invocation from inside it (exit $code_in) — outside: $out_out | inside: $out_in"
+  echo "FAIL: (l2) CLAUDE_PROJECT_DIR unset, cwd/target both outside any git work-tree — expected refused (non-zero), got exit 0. Output: $out_out"
+  fail=$((fail+1))
+fi
+
+# --- (q) target-repo-governance: CLAUDE_PROJECT_DIR pointed at an
+# unrelated, empty (but plausible-looking, git-initialized) directory, and
+# the Write targets an owned-tree path that is ALSO not inside any git
+# work-tree (so the git-toplevel fallback cannot resolve it either) -> root
+# is genuinely indeterminate -> default-deny per §2(c), not silently
+# allowed. This is the class of bug the hunter reproduced against
+# scope-gate.sh (an uncross-checked CLAUDE_PROJECT_DIR silently disabling
+# the gate) generalized to this gate.
+unrelated_dir="$(mktemp -d)"
+git init -q "$unrelated_dir" >/dev/null 2>&1
+non_git_target_dir="$(mktemp -d)"
+SCRATCH_SUBJECT_Q="gateroot-unrelated-projectdir-test"
+mkdir -p "$non_git_target_dir/docs/reports/records/$SCRATCH_SUBJECT_Q"
+payload_q=$(cat <<JSON
+{"tool_name":"Write","tool_input":{"file_path":"$non_git_target_dir/docs/reports/records/$SCRATCH_SUBJECT_Q/verify.md","content":"status: idle\n"}}
+JSON
+)
+# cwd is also pinned to the non-git target dir so the second-stage
+# git-toplevel-of-cwd fallback (§2(b)) cannot rescue this into a real repo
+# either — otherwise this test would run inside this repo's own checkout
+# and the cwd fallback alone would find a (wrong, but real) root.
+out_q="$(cd "$non_git_target_dir" && env CLAUDE_PROJECT_DIR="$unrelated_dir" bash -c 'printf "%s" "$1" | bash "$2"' _ "$payload_q" "$GATE" 2>&1)"
+rc_q=$?
+rm -rf "$unrelated_dir" "$non_git_target_dir"
+if [ "$rc_q" -ne 0 ]; then
+  echo "PASS: (q) CLAUDE_PROJECT_DIR pointed at an unrelated empty dir, target's owned-tree write has no resolvable git root either — indeterminate root default-denied (exit $rc_q), not silently allowed"
+  pass=$((pass+1))
+else
+  echo "FAIL: (q) CLAUDE_PROJECT_DIR pointed at an unrelated empty dir, target has no resolvable git root — expected refused (default-deny), got exit 0 (silently allowed). Output: $out_q"
+  fail=$((fail+1))
+fi
+
+# --- (r) target-repo-governance: CLAUDE_PROJECT_DIR correctly set (target
+# is under it, and it looks like a project root) -> §11 enforced normally
+# against that SEPARATE target project, not against this rulebook repo.
+target_repo_r="$(mktemp -d -p "$WORKDIR")"
+git init -q "$target_repo_r" >/dev/null 2>&1
+write_contract "$target_repo_r"
+payload_r=$(cat <<JSON
+{"tool_name":"Write","tool_input":{"file_path":"$target_repo_r/docs/reports/records/checkout-flow/coding.md","content":"status: idle\n"}}
+JSON
+)
+out_r="$(CLAUDE_PROJECT_DIR="$target_repo_r" bash "$GATE" <<<"$payload_r" 2>&1)"
+rc_r=$?
+if [ "$rc_r" -ne 0 ] && printf '%s' "$out_r" | grep -q "§11"; then
+  echo "PASS: (r) valid CLAUDE_PROJECT_DIR pointed at a separate target project — §11 foreign-record write refused there (exit $rc_r), cites §11"
+  pass=$((pass+1))
+else
+  echo "FAIL: (r) valid CLAUDE_PROJECT_DIR pointed at a separate target project — expected §11 refusal, got exit $rc_r. Output: $out_r"
   fail=$((fail+1))
 fi
 

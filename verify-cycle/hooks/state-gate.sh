@@ -103,23 +103,64 @@ state_name="${VERIFY_RECORD_NAME:-verify-record.md}"
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)"
 rules_file="${VERIFY_TRANSITION_RULES:-$HOOK_DIR/transition-rules.md}"
 
-# Root is discovered by walking UP from the hook's own on-disk location to
-# the nearest enclosing `.git`, never from the process cwd or
-# CLAUDE_PROJECT_DIR — a hook invoked with a cwd outside the repo must still
-# resolve to, and guard, this repo's own state file.
+# Root resolution (frozen contract:
+# docs/proposals/2026-07-26-gate-root-from-project-dir.md): candidate root =
+# CLAUDE_PROJECT_DIR when set, but only trusted once validated — (a) the
+# tool call's actual target resolves inside it, and (b) it looks like a real
+# project root (git work-tree top-level, or docs/specs/role-handoff-contract.md
+# present). An unset or invalid candidate falls back to the git top-level of
+# the tool call's target path, then the git top-level of cwd. A root that
+# remains indeterminate is refused outright — never silently allowed,
+# including for writes into the owned record tree.
+_gate_target="$(printf '%s' "$payload" | python3 -c '
+import json, sys
+try:
+    e = json.loads(sys.stdin.read())
+except Exception:
+    sys.exit(0)
+ti = e.get("tool_input") if isinstance(e, dict) else None
+if isinstance(ti, dict):
+    fp = ti.get("file_path")
+    if isinstance(fp, str) and fp:
+        print(fp)
+' 2>/dev/null || true)"
+
+_gate_is_plausible_root() {
+  [ -n "$1" ] && [ -d "$1" ] && { [ -e "$1/.git" ] || [ -f "$1/docs/specs/role-handoff-contract.md" ]; }
+}
+
+_gate_target_under_root() {
+  [ -z "$2" ] && return 0
+  python3 -c '
+import os, posixpath, sys
+root, target = sys.argv[1], sys.argv[2]
+try:
+    root_real = posixpath.normpath(os.path.realpath(root).replace("\\", "/"))
+except Exception:
+    sys.exit(1)
+norm = target.replace("\\", "/")
+absu = norm if posixpath.isabs(norm) else posixpath.join(root_real, norm)
+absu = posixpath.normpath(absu)
+real = posixpath.normpath(os.path.realpath(absu).replace("\\", "/"))
+sys.exit(0 if (real == root_real or real.startswith(root_real + "/")) else 1)
+' "$1" "$2"
+}
+
 root=""
-dir="$HOOK_DIR"
-while :; do
-  if [ -e "$dir/.git" ]; then
-    root="$dir"
-    break
-  fi
-  parent="$(dirname "$dir")"
-  [ "$parent" = "$dir" ] && break
-  dir="$parent"
-done
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && _gate_is_plausible_root "$CLAUDE_PROJECT_DIR" && _gate_target_under_root "$CLAUDE_PROJECT_DIR" "$_gate_target"; then
+  root="$(cd "$CLAUDE_PROJECT_DIR" 2>/dev/null && pwd -P)"
+fi
 if [ -z "$root" ]; then
-  echo "verify-cycle: refused — the transition rules could not be loaded: no enclosing .git found by walking up from this hook's own directory ($HOOK_DIR)." >&2
+  _gate_fallback_dir="$_gate_target"
+  [ -n "$_gate_fallback_dir" ] || _gate_fallback_dir="$(pwd -P)"
+  [ -d "$_gate_fallback_dir" ] || _gate_fallback_dir="$(dirname "$_gate_fallback_dir")"
+  root="$(git -C "$_gate_fallback_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+fi
+if [ -z "$root" ]; then
+  root="$(git -C "$(pwd -P)" rev-parse --show-toplevel 2>/dev/null || true)"
+fi
+if [ -z "$root" ]; then
+  echo "verify-cycle: refused — no project root could be determined: CLAUDE_PROJECT_DIR is unset or failed validation (target-under-root / plausible-project-root check), and no git top-level was found for the tool call's target or for cwd. Refusing rather than silently allowing an indeterminate-root write." >&2
   exit 2
 fi
 
