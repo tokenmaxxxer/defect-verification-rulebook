@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# --- fail-closed trap: FIRST executable statement, before any set/source. Any
+# abort with a code that is neither 0 (allow) nor 2 (deny) is forced to 2 (DENY),
+# since Claude Code PreToolUse treats non-2 exits as non-blocking (fail-OPEN).
+__fc(){ rc=$?; if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then echo "fail-closed: gate aborted (rc=$rc)" >&2; exit 2; fi; }
+trap __fc EXIT
 # PreToolUse hook for the `verify` role, conforming to
 # docs/specs/role-handoff-contract.md v2 (the blackboard/event model). This
 # gate now enforces exactly two things, both evaluated against the TARGET

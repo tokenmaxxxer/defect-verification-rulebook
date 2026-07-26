@@ -562,6 +562,38 @@ else
   fail=$((fail+1))
 fi
 
+# --- (t) fail-closed trap-at-top: a PRE-LOGIC abort (before any verdict logic
+# runs) must force exit 2 (DENY), not a non-2 exit that Claude Code PreToolUse
+# treats as NON-blocking (fail-OPEN). Here we induce the abort by running a
+# sibling gate that `source`s _gate-common.sh from a location where that file
+# is absent: we copy record-fields-gate.sh (which sources $HERE/_gate-common.sh)
+# into a scratch dir WITHOUT _gate-common.sh, so the source fails under
+# `set -euo pipefail` before any gate logic executes. Without the trap-at-top
+# this aborts with the source's non-2 code (fail-open); with it, exit 2 (DENY).
+# (docs/proposals/2026-07-26-gates-fail-closed-trap-at-top.md)
+SIBLING_GATE="$HOOK_DIR/record-fields-gate.sh"
+if [ -f "$SIBLING_GATE" ]; then
+  abort_dir="$(mktemp -d -p "$WORKDIR")"
+  cp "$SIBLING_GATE" "$abort_dir/record-fields-gate.sh"   # deliberately NOT copying _gate-common.sh
+  root="$(new_root)"
+  payload_t=$(cat <<JSON
+{"tool_name":"Write","tool_input":{"file_path":"$root/docs/reports/records/checkout-flow/verify.md","content":"status: idle\n"}}
+JSON
+)
+  out_t="$(CLAUDE_PROJECT_DIR="$root" bash "$abort_dir/record-fields-gate.sh" <<<"$payload_t" 2>&1)"
+  rc_t=$?
+  if [ "$rc_t" -eq 2 ]; then
+    echo "PASS: (t) pre-logic abort (failed source of _gate-common.sh) fails closed to exit 2 (DENY)"
+    pass=$((pass+1))
+  else
+    echo "FAIL: (t) pre-logic abort — expected exit 2 (DENY) via trap-at-top, got exit $rc_t. Output: $out_t"
+    fail=$((fail+1))
+  fi
+else
+  echo "FAIL: (t) pre-logic abort — sibling gate $SIBLING_GATE not found to exercise the trap"
+  fail=$((fail+1))
+fi
+
 echo
 echo "== $pass passed, $fail failed =="
 [ "$fail" -eq 0 ]
