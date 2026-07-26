@@ -382,6 +382,98 @@ else
   fail=$((fail+1))
 fi
 
+
+# --- path-reference default-deny (docs/proposals/2026-07-26-gate-nested-shell-default-deny.md)
+# Each of these targets a FOREIGN role's record slot via a write idiom this
+# gate never enumerated by name (write_text/write_bytes/os.write) or via a
+# nested shell / command substitution wrapper around a plain write. The
+# rule is not "match this idiom" — it is "default-deny any reference into
+# the owned record tree this gate cannot prove is read-only" — so all five
+# must be refused regardless of the specific idiom used.
+payload_p1=$(cat <<JSON
+{"tool_name":"Bash","tool_input":{"command":"python3 -c \"import pathlib; pathlib.Path('docs/reports/records/$SCRATCH_SUBJECT/coding.md').write_text('x')\""}}
+JSON
+)
+out_p1="$(cd "$REPO_ROOT" && printf '%s' "$payload_p1" | bash "$GATE" 2>&1)"
+rc_p1=$?
+if [ "$rc_p1" -ne 0 ]; then
+  echo "PASS: (p1) Bash pathlib.Path(...).write_text(...) write to a foreign role's record is refused (exit $rc_p1)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (p1) Bash pathlib.Path(...).write_text(...) write to a foreign role's record was ALLOWED (exit 0): $out_p1"
+  fail=$((fail+1))
+fi
+
+payload_p2=$(cat <<JSON
+{"tool_name":"Bash","tool_input":{"command":"python3 -c \"import pathlib; pathlib.Path('docs/reports/records/$SCRATCH_SUBJECT/coding.md').write_bytes(b'x')\""}}
+JSON
+)
+out_p2="$(cd "$REPO_ROOT" && printf '%s' "$payload_p2" | bash "$GATE" 2>&1)"
+rc_p2=$?
+if [ "$rc_p2" -ne 0 ]; then
+  echo "PASS: (p2) Bash pathlib.Path(...).write_bytes(...) write to a foreign role's record is refused (exit $rc_p2)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (p2) Bash pathlib.Path(...).write_bytes(...) write to a foreign role's record was ALLOWED (exit 0): $out_p2"
+  fail=$((fail+1))
+fi
+
+payload_p3=$(cat <<JSON
+{"tool_name":"Bash","tool_input":{"command":"python3 -c \"import os; fd = os.open('docs/reports/records/$SCRATCH_SUBJECT/coding.md', os.O_WRONLY | os.O_CREAT); os.write(fd, b'x')\""}}
+JSON
+)
+out_p3="$(cd "$REPO_ROOT" && printf '%s' "$payload_p3" | bash "$GATE" 2>&1)"
+rc_p3=$?
+if [ "$rc_p3" -ne 0 ]; then
+  echo "PASS: (p3) Bash os.write(...) write to a foreign role's record is refused (exit $rc_p3)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (p3) Bash os.write(...) write to a foreign role's record was ALLOWED (exit 0): $out_p3"
+  fail=$((fail+1))
+fi
+
+payload_p4=$(cat <<JSON
+{"tool_name":"Bash","tool_input":{"command":"sh -c \"echo x > docs/reports/records/$SCRATCH_SUBJECT/coding.md\""}}
+JSON
+)
+out_p4="$(cd "$REPO_ROOT" && printf '%s' "$payload_p4" | bash "$GATE" 2>&1)"
+rc_p4=$?
+if [ "$rc_p4" -ne 0 ]; then
+  echo "PASS: (p4) sh -c-wrapped write to a foreign role's record is refused (exit $rc_p4)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (p4) sh -c-wrapped write to a foreign role's record was ALLOWED (exit 0): $out_p4"
+  fail=$((fail+1))
+fi
+
+payload_p5=$(cat <<JSON
+{"tool_name":"Bash","tool_input":{"command":"echo x > \$(echo docs/reports/records/$SCRATCH_SUBJECT/coding.md)"}}
+JSON
+)
+out_p5="$(cd "$REPO_ROOT" && printf '%s' "$payload_p5" | bash "$GATE" 2>&1)"
+rc_p5=$?
+if [ "$rc_p5" -ne 0 ]; then
+  echo "PASS: (p5) command-substitution-wrapped write to a foreign role's record is refused (exit $rc_p5)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (p5) command-substitution-wrapped write to a foreign role's record was ALLOWED (exit 0): $out_p5"
+  fail=$((fail+1))
+fi
+
+payload_p6=$(cat <<JSON
+{"tool_name":"Bash","tool_input":{"command":"printf 'status: idle\\n' > docs/reports/records/$SCRATCH_SUBJECT/verify.md"}}
+JSON
+)
+out_p6="$(cd "$REPO_ROOT" && printf '%s' "$payload_p6" | bash "$GATE" 2>&1)"
+rc_p6=$?
+if [ "$rc_p6" -eq 0 ]; then
+  echo "PASS: (p6) plain own-record Bash redirection at a legal state transition is still allowed (exit 0)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (p6) plain own-record Bash redirection at a legal state transition was DENIED (exit $rc_p6): $out_p6"
+  fail=$((fail+1))
+fi
+
 cleanup_scratch
 
 echo
