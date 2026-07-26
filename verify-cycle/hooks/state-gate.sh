@@ -342,11 +342,62 @@ elif tool == "Bash":
                     else:
                         bash_literal_targets.append(tok)
 
+            # write-through-another-tool: e.g. `python3 -c "open(path,
+            # 'w').write(...)"`. This is not a shell write idiom at all —
+            # judged by RESOLVED TARGET PATH per this gate's own header, not
+            # by idiom-matching the command string, so a literal open()
+            # target is extracted the same as a redirect/tee/cp target
+            # above, and a non-literal (dynamic) one is unresolvable.
+            for open_m in re.finditer(
+                r"\bopen\s*\(\s*(['\"])(.*?)\1\s*,\s*(['\"])[wxa][^'\"]*\3", command
+            ):
+                bash_write_shaped = True
+                tok = open_m.group(2)
+                if is_dynamic(tok):
+                    bash_unresolvable = True
+                else:
+                    bash_literal_targets.append(tok)
+
     # An unresolvable target only matters (routes the call into the
     # state-file check) if the command was write-shaped at all. A command
     # with no write-shaped construct is never treated as reaching the state
     # file just because it contains some unrelated unresolvable token.
     bash_unresolvable = bash_unresolvable and bash_write_shaped
+
+    # --- §11 ownership check for Bash-mediated writes ----------------------
+    # The Write/Edit/MultiEdit ownership check above (lines ~242-254) does
+    # not, by itself, cover a write reaching a foreign record through Bash
+    # (any idiom, or a write-through-another-tool like python3's open()).
+    # Every literal Bash write target is classified the same way a
+    # Write/Edit file_path is. A write-capable Bash command whose target is
+    # unresolvable, but whose command text names the owned record tree
+    # (docs/reports/records/), is refused rather than allowed through —
+    # default-deny on an indeterminate target within the owned tree.
+    for tok in bash_literal_targets:
+        rel_b = repo_relative_or_none(resolve(tok))
+        category_b, subject_b = classify_records_path(rel_b) if rel_b is not None else (None, None)
+        if category_b == "foreign-record":
+            refuse(
+                "verify-cycle: refused — path ownership conflict: a Bash-mediated write "
+                "targets %s, which falls under another role's owned subject-scoped record "
+                "(docs/reports/records/%s/) per docs/specs/role-handoff-contract.md §11 "
+                "NEVER-OVERWRITE. verify may write only its own "
+                "docs/reports/records/%s/verify.md slot; refusing rather than overwriting "
+                "another role's record." % (rel_b, subject_b, subject_b)
+            )
+    if (
+        bash_write_shaped
+        and bash_unresolvable
+        and isinstance(command, str)
+        and "docs/reports/records/" in command
+    ):
+        refuse(
+            "verify-cycle: refused — a Bash write-capable command's target path could not "
+            "be statically resolved, and the command references the owned record tree "
+            "(docs/reports/records/). Per §11, an indeterminate write target within that "
+            "tree is default-denied rather than allowed through."
+        )
+
     candidates.extend(bash_literal_targets)
 
 state_path_real = resolve(state_name)

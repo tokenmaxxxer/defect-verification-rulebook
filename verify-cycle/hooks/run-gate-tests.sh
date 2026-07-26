@@ -321,6 +321,69 @@ else
   pass=$((pass+1))
 fi
 
+# --- (o) write-detection bypass fix (docs/proposals/2026-07-26-fix-state-gate-writeop-bypass.md)
+# Root resolution for this gate is always anchored to the hook's own git
+# root (never CLAUDE_PROJECT_DIR), so these three cases operate directly
+# against THIS repo's checkout with a scratch subject, cleaned up on exit.
+REPO_ROOT="$(cd "$HOOK_DIR/../.." && pwd -P)"
+SCRATCH_SUBJECT="gatefix-bypass-test"
+SCRATCH_DIR="$REPO_ROOT/docs/reports/records/$SCRATCH_SUBJECT"
+cleanup_scratch() { rm -rf "$SCRATCH_DIR"; }
+trap 'cleanup_scratch; rm -rf "$WORKDIR"' EXIT
+cleanup_scratch
+mkdir -p "$SCRATCH_DIR"
+
+# (o1) Bash + python3 -c "open(<foreign role's record path>,'w').write(...)"
+# must be REFUSED — this is the write-through-another-tool idiom the
+# idiom-whitelist previously fell through on.
+payload_o1=$(cat <<JSON
+{"tool_name":"Bash","tool_input":{"command":"python3 -c \"open('docs/reports/records/$SCRATCH_SUBJECT/coding.md','w').write('x')\""}}
+JSON
+)
+out_o1="$(cd "$REPO_ROOT" && printf '%s' "$payload_o1" | bash "$GATE" 2>&1)"
+rc_o1=$?
+if [ "$rc_o1" -ne 0 ]; then
+  echo "PASS: (o1) Bash python3-open write to a foreign role's record is refused (exit $rc_o1)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (o1) Bash python3-open write to a foreign role's record was ALLOWED (exit 0): $out_o1"
+  fail=$((fail+1))
+fi
+
+# (o2) a legal write to verify's OWN record slot must still be ALLOWED.
+payload_o2=$(cat <<JSON
+{"tool_name":"Write","tool_input":{"file_path":"docs/reports/records/$SCRATCH_SUBJECT/verify.md","content":"status: idle\n"}}
+JSON
+)
+out_o2="$(cd "$REPO_ROOT" && printf '%s' "$payload_o2" | bash "$GATE" 2>&1)"
+rc_o2=$?
+if [ "$rc_o2" -eq 0 ]; then
+  echo "PASS: (o2) legal write to verify's own record slot is allowed (exit 0)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (o2) legal write to verify's own record slot was DENIED (exit $rc_o2): $out_o2"
+  fail=$((fail+1))
+fi
+
+# (o3) a Bash python3-open write whose target path cannot be resolved
+# statically (built via concatenation), in a command that names the owned
+# record tree, must be REFUSED (default-deny on an indeterminate target).
+payload_o3=$(cat <<JSON
+{"tool_name":"Bash","tool_input":{"command":"python3 -c \"import sys; open('docs/reports/records/' + sys.argv[1] + '/coding.md','w').write('x')\" $SCRATCH_SUBJECT"}}
+JSON
+)
+out_o3="$(cd "$REPO_ROOT" && printf '%s' "$payload_o3" | bash "$GATE" 2>&1)"
+rc_o3=$?
+if [ "$rc_o3" -ne 0 ]; then
+  echo "PASS: (o3) Bash python3-open write with indeterminate target in the owned record tree is refused (exit $rc_o3)"
+  pass=$((pass+1))
+else
+  echo "FAIL: (o3) Bash python3-open write with indeterminate target in the owned record tree was ALLOWED (exit 0): $out_o3"
+  fail=$((fail+1))
+fi
+
+cleanup_scratch
+
 echo
 echo "== $pass passed, $fail failed =="
 [ "$fail" -eq 0 ]
