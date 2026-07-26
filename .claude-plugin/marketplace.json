@@ -1,0 +1,18 @@
+{
+  "name": "tokenmaxxxer-verify",
+  "owner": {
+    "name": "Jung Jiwon & Lee Jongkwan"
+  },
+  "plugins": [
+    {
+      "name": "verify-cycle",
+      "source": "./verify-cycle",
+      "description": "The verify role's state machine: idle -> reproducing -> reproduced -> cleared. Adversarial reproduction of defects coding and qa may have missed, gated by transition-rules.md; blocking findings addressed to coding are not overridden by a clean review-record."
+    },
+    {
+      "name": "verify-agent-env",
+      "source": "./verify-agent-env",
+      "description": "One-install environment bundle for the verify role: installs verify-cycle via dependency. Contains no code of its own."
+    }
+  ]
+}

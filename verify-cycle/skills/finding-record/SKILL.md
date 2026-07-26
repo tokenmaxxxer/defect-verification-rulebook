@@ -1,0 +1,88 @@
+---
+name: finding-record
+description: Use while acting as the verify role in the reproducing or reproduced state, to record one outcome per reproduction attempt — and, when a defect reproduces, a finding addressed to coding — in verify-record.md. Use whenever an attempt has been made and needs an outcome written down — never to fix or patch what was found.
+---
+
+# finding-record
+
+Belongs to `reproducing` (initial recording) and `reproduced` (dispute
+resolution or re-examination recorded inline, still against the same
+attempt). Produces the per-attempt outcome record, and any escalating
+`finding` block, inside `verify-record.md`, the role's state file, at the
+attempt blocks below the header block.
+
+This skill never writes to any file other than `verify-record.md`. It does
+not fix, patch, or suggest a patch for anything it finds — it reports.
+
+## What it asks the user for
+
+Nothing, by default — recording an outcome is verify's own reproduction
+work, made solo. The skill asks the user only when it cannot attempt a
+reproduction at all from what it has: "coding-record points at a runtime
+condition I can't trigger from a static diff — can you point me at
+deployed access, or should this attempt stay open pending that?" That
+answer, or the absence of one, decides whether the attempt proceeds; it
+does not gate the write of an attempt already made.
+
+In `reproduced`, if a finding is disputed, this skill asks the user to
+state their side, records it, and re-examines the reproduction evidence —
+it does not treat the dispute itself as a request to fix anything.
+
+## The outcome set
+
+Exactly one of, per attempt:
+
+- **`reproduced`** — the defect reproduces, with evidence.
+- **`not-reproduced`** — the attempt did not reproduce a defect. Recorded
+  regardless, so a later pass can see the ground already covered rather
+  than repeating it blind.
+
+When an attempt reproduces, this skill additionally writes an inline
+`finding` block per `docs/specs/role-handoff-contract.md` §2's `finding`
+row, `addressed_to: coding`, carrying `severity: blocking` or `advisory` —
+never merged into the attempt's own two-value outcome field.
+
+## The artifact and its field list
+
+Written to `verify-record.md`, in this repository's root (path
+configurable via `VERIFY_RECORD_NAME`), as one `---`-delimited block per
+attempt below the header block. Attempt fields:
+
+1. **`attempt`** — a stable identifier for what was being tested, verbatim
+   reference to the claim under test (a qa defect report, a review
+   requirement marked `Present`, or verify's own devised path).
+2. **`outcome`** — `reproduced` or `not-reproduced`.
+3. **`evidence`** — a pointer into the actual reproduction: repro steps,
+   commit sha, run output, or a log excerpt. Never a paraphrase of what was
+   attempted — the reproduction path itself. This is what makes the record
+   actionable: an outcome of `reproduced` with no evidence pointer is
+   refused by this skill before it is written (see below).
+
+When an attempt reproduces, the accompanying `finding` block carries,
+verbatim from the contract: `requirement`, `verdict`
+(`Present|Surface|Absent|Incorrect|Unverifiable`), `evidence`, `rationale`,
+`spec_vs_built` (required only when `verdict: Incorrect`),
+`addressed_to: coding`, `severity: blocking|advisory`.
+
+Template at
+`verify-cycle/skills/finding-record/templates/finding-record-template.md`
+is the field skeleton this skill fills in per attempt.
+
+## Refusal the skill itself enforces
+
+This skill refuses to accept an outcome of `reproduced` with no `evidence`
+pointer. `not-reproduced` still requires an `evidence` field describing
+what was attempted, since by definition there is no reproduction evidence
+to point at otherwise.
+
+## What this skill never does
+
+- Fix, patch, or propose a patch for anything it records, even if the user
+  asks it to while giving an answer — if asked to fix what it found, say
+  plainly that this role reports and does not fix, and that the finding
+  stands recorded as-is pending coding's own resolution of it.
+- Merge `reproduced`/`not-reproduced` into a single pass/fail signal that
+  loses which attempts were even taken.
+- Write to any file other than `verify-record.md`.
+- Treat a clean `review-record` as grounds to skip a reproduction attempt
+  or record a `not-reproduced` outcome without actually attempting it.
