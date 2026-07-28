@@ -1,8 +1,0 @@
-{
-  "name": "verify-cycle",
-  "version": "0.1.0",
-  "description": "Implements the verify role's state machine (idle -> reproducing -> reproduced -> cleared) from docs/specs/agent-roles.md: adversarial reproduction of defects against what coding and qa have already produced for a subject. A PreToolUse gate enforces STRUCTURE ONLY on the verify record's transitions and its owned path (docs/reports/records/<subject>/verify.md) — it never judges what counts as a defect. A blocking finding addressed to coding is independent of, and not overridden by, a clean review-record.",
-  "author": {
-    "name": "Jung Jiwon & Lee Jongkwan"
-  }
-}

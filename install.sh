@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-shot installer for the tokenmaxxxer verify-agent-rulebook stack.
 # Registers ONLY the tokenmaxxxer-verify marketplace and installs ONLY this
-# repository's plugins (verify-cycle) plus its bundle (verify-agent-env).
+# repository's plugins (verify) plus its bundle (verify).
 # Names no other repository and no other marketplace.
 #
 # Installs for your account only (user scope). Uses a real `claude` CLI
@@ -11,9 +11,9 @@
 set -euo pipefail
 
 MARKET="tokenmaxxxer-verify"
-BUNDLE="verify-agent-env"
+BUNDLE="verify"
 GITHUB_REPO="tokenmaxxxer/verify-agent-rulebook"
-PLUGINS=(verify-cycle)
+PLUGINS=(verify)
 
 usage() {
   cat <<'USAGE'
@@ -162,7 +162,7 @@ if [ -n "$CLI" ] && [ -x "$CLI" ]; then
     echo "    The rest of the stack is installed. Re-run this script — it is idempotent —"
     echo "    or install the failures individually with: $CLI plugin install <name>@$MARKET --scope user"
   else
-    echo "==> installed $BUNDLE@$MARKET and verify-cycle."
+    echo "==> installed $BUNDLE@$MARKET and verify."
   fi
 else
   echo "==> no claude CLI found (standalone or bundled): writing user settings directly"
@@ -180,5 +180,5 @@ cat <<'MSG'
       auto-update. There is no CLI/config switch for this toggle; it is a
       one-time interactive step.
     - without auto-update, refresh manually anytime:
-      claude plugin update verify-agent-env@tokenmaxxxer-verify
+      claude plugin update verify@tokenmaxxxer-verify
 MSG
