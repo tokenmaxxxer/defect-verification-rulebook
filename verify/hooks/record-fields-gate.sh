@@ -6,7 +6,7 @@ __fc(){ rc=$?; if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then echo "fail-closed: gate
 trap __fc EXIT
 # PreToolUse hook (Write|Edit|MultiEdit): enforces contract §20's per-role
 # record minimum content on writes reaching verify's own record file
-# docs/reports/records/<subject>/verify.md.
+# docs/issue-<n>/reports/verify.md.
 #
 # Peer to state-gate.sh: state-gate validates the loop_state TRANSITION; this
 # gate validates the §20 CONTENT of the same proposed record. It never edits
@@ -19,7 +19,7 @@ trap __fc EXIT
 # section.
 #
 # Fires ONLY on a write whose resolved target is a verify.md under
-# docs/reports/records/<subject>/. Anything else passes through untouched.
+# docs/issue-<n>/reports/. Anything else passes through untouched.
 #
 # FAIL-CLOSED on every malformed/missing-input branch: unparseable JSON, non-
 # dict event/tool_input, a target that IS the record path but whose resulting
@@ -109,14 +109,14 @@ else:
     rel = path.replace("\\", "/")
 
 # Both spellings of verify's own record. The v2 board path is
-# docs/reports/records/<subject>/verify.md, but this repo's other gates —
+# docs/issue-<n>/reports/verify.md, but this repo's other gates —
 # state-gate.sh, trailer-gate.sh — and its SKILL still work against the flat
 # verify-record.md at the repo root. Matching only the board path meant this
 # gate never fired on the file verify actually writes, so contract section 20's
 # content requirements went unenforced entirely (measured 2026-07-27). review
 # matches both spellings for exactly this reason.
 state_name = os.environ.get("VERIFY_STATE_NAME") or "verify-record.md"
-is_own_record = bool(re.match(r'^docs/reports/records/[^/]+/verify\.md$', rel)) \
+is_own_record = bool(re.match(r'^docs/issue-[0-9]+/reports/verify\.md$', rel)) \
     or posixpath.basename(rel) == state_name
 if not is_own_record:
     # Not verify's own record file -> not this gate's business.

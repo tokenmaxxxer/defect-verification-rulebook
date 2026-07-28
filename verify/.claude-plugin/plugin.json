@@ -1,0 +1,7 @@
+{
+  "name": "verify",
+  "description": "The verify role on contract v3: adversarial reproduction of defects that coding, qa, and review all missed \u2014 independent attempts with recorded outcomes and evidence, inline findings addressed to coding, never a fix. Directive carries the four facets; gates enforce attempt/record required fields, closed_checks against code_under_review:, and the Subject: issue-<n> trailer.",
+  "author": {
+    "name": "Jung Jiwon & Lee Jongkwan"
+  }
+}

@@ -6,7 +6,7 @@ __fc(){ rc=$?; if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then echo "fail-closed: gate
 trap __fc EXIT
 # PreToolUse hook (Write|Edit|MultiEdit): enforces contract §16's cite-and-skip
 # sha-equality rule on writes reaching verify's own record file
-# docs/reports/records/<subject>/verify.md.
+# docs/issue-<n>/reports/verify.md.
 #
 # §16: a `closed_checks:` entry may be cited (cite-and-skip) instead of
 # re-derived ONLY when its `code_sha` equals the code sha currently under
@@ -48,12 +48,9 @@ if isinstance(ti,dict):
 
 root="$(resolve_root "$_target")"
 
-# Current code sha under review. Computed here (not in python) so a git failure
-# is visible as empty and the python layer fails closed on it.
+# v3: the working checkout is the role's docs branch, so HEAD is never the
+# code under review. The record itself must name it (code_under_review:).
 current_sha=""
-if [ -n "$root" ]; then
-  current_sha="$(git -C "$root" rev-parse HEAD 2>/dev/null || true)"
-fi
 
 _grc=0
 VG_PAYLOAD="$payload" VG_ROOT="$root" VG_SHA="$current_sha" python3 <<'PY' || _grc=$?
@@ -100,7 +97,7 @@ try:
 except OSError:
     resolved = a
 rel = resolved[len(root):].lstrip("/") if root and (resolved == root or resolved.startswith(root + "/")) else n
-if not re.match(r'^docs/reports/records/([^/]+)/verify\.md$', rel):
+if not re.match(r'^docs/issue-[0-9]+/reports/verify\.md$', rel):
     allow()
 
 # Reconstruct resulting content.
@@ -144,11 +141,13 @@ cited = re.findall(r'^\s*-?\s*code_sha\s*:\s*([0-9A-Za-z]+)\s*$', new_text, re.M
 if not cited:
     allow()
 
-current_sha = os.environ.get("VG_SHA", "").strip()
+mcur = re.findall(r"^\s*(?:code_under_review|upstream_code_sha)\s*:\s*([0-9A-Za-z]+)\s*$", new_text, re.M)
+current_sha = mcur[0].strip() if mcur else ""
 if not current_sha:
-    deny("record %s declares closed_checks with cited code_sha value(s), but the code sha "
-         "currently under review could not be determined (git rev-parse HEAD failed at the "
-         "project root). §16 cannot be verified, so the write is refused (fail-closed)." % rel)
+    deny("record %s declares closed_checks with cited code_sha value(s), but names no "
+         "code_under_review: field. Under per-role issue branches the working HEAD is a docs "
+         "commit, never the code under review, so the record must name the sha explicitly. "
+         "s16 cannot be verified; refused (fail-closed)." % rel)
 
 def eq(a, b):
     a, b = a.lower(), b.lower()

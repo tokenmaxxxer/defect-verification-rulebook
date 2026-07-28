@@ -5,14 +5,9 @@
   },
   "plugins": [
     {
-      "name": "verify-cycle",
-      "source": "./verify-cycle",
-      "description": "The verify role's state machine: idle -> reproducing -> reproduced -> cleared. Adversarial reproduction of defects coding and qa may have missed, gated by transition-rules.md; blocking findings addressed to coding are not overridden by a clean review-record."
-    },
-    {
-      "name": "verify-agent-env",
-      "source": "./verify-agent-env",
-      "description": "One-install environment bundle for the verify role: installs verify-cycle via dependency. Contains no code of its own."
+      "name": "verify",
+      "source": "./verify",
+      "description": "The verify role on contract v3: adversarial reproduction of defects that coding, qa, and review all missed \u2014 independent attempts with recorded outcomes and evidence, inline findings addressed to coding, never a fix. Directive carries the four facets; gates enforce attempt/record required fields, closed_checks against code_under_review:, and the Subject: issue-<n> trailer."
     }
   ]
 }
