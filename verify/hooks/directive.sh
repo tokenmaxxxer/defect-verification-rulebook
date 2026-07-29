@@ -50,14 +50,15 @@ EXECUTION JUDGMENT (phase 2, quality bar):
 - A closed_checks cite is valid only against the record's
   code_under_review: sha. Different sha: re-derive, never cite.
 
-YOUR RECORD IS THE BOARD (do not skip this): WAKES-ON reads
-docs/issue-<n>/reports/verify.md ONLY — research files, surveys, and
-proposals wake no one. The record is execution-surface material, so:
+YOUR RECORD IS THE BOARD (do not skip this): docs/issue-<n>/reports/verify.md
+is the ONLY file that counts as this role's board state — research files,
+surveys, and proposals do not. The record is execution-surface material, so:
 write it as your FIRST act of phase 2, and update its loop_state at
 every transition. Ending phase 2 without your record committed on the
-branch means the board never saw your work and no downstream role can
-ever be woken by it. (Measured: a phase-1-only issue left the board
-empty and machine wake-up dead.)
+branch means the board never saw your work. (Measured: a phase-1-only
+issue left the board empty and machine wake-up dead.) For who this
+record's states summon, see docs/specs/wake-routing.md — routing is not
+restated here.
 
 DIRECTIVE
 
