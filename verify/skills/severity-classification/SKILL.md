@@ -49,9 +49,9 @@ two sourced deterministic band shapes, chosen by the engagement:
 
 Do not use DREAD's averaged-score shape for this skill, per the sourced
 disagreement above. `blocking` vs. `advisory` is the field this contract's
-gates and other roles' WAKES-ON rows actually consult (§3, §5); the chosen
-band scale is a tool for reaching that call consistently, not a
-contract-visible field itself.
+gates actually consult (§5); the chosen band scale is a tool for reaching
+that call consistently, not a contract-visible field itself. For which
+roles' loops those gates affect, see docs/specs/wake-routing.md.
 
 ## The artifact
 
