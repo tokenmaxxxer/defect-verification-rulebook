@@ -16,26 +16,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/record-fields-gate.sh"
-          },
-          {
-            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/closed-checks-gate.sh"
           }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/handbook-trigger-gate.sh"
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/trailer-gate.sh"
-          }
-        ]
+        ],
+        "env": {
+          "RECORD_FIELDS_TERMINAL_STATES": "cleared"
+        }
       }
     ]
   }
