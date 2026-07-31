@@ -1,0 +1,8 @@
+{
+  "name": "verify-directive-depth",
+  "version": "0.1.0",
+  "description": "Deepens the verify role's USE-WHEN and HAND-OFF directive facets into explicit steps, a judgment criterion, and a never-line for attempt scoping and outcome recording.",
+  "author": {
+    "name": "Jung Jiwon & Lee Jongkwan"
+  }
+}

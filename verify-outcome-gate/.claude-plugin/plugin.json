@@ -1,0 +1,8 @@
+{
+  "name": "verify-outcome-gate",
+  "version": "0.1.0",
+  "description": "PreToolUse gate that refuses writes to verify.md declaring an outcome value outside the adopted set or missing its required evidence field.",
+  "author": {
+    "name": "Jung Jiwon & Lee Jongkwan"
+  }
+}

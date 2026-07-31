@@ -1,0 +1,8 @@
+{
+  "name": "verify-finding-gate",
+  "version": "0.1.0",
+  "description": "Requires a reproduced attempt in verify.md to carry a paired finding block (verdict, addressed_to: coding, severity) before the write is allowed.",
+  "author": {
+    "name": "Jung Jiwon & Lee Jongkwan"
+  }
+}

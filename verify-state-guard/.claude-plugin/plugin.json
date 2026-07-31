@@ -1,0 +1,8 @@
+{
+  "name": "verify-state-guard",
+  "version": "0.1.0",
+  "description": "Enforces the fixed idle<reproducing<reproduced<cleared loop_state order for verify records, and refuses cleared while a severity: blocking finding is unresolved.",
+  "author": {
+    "name": "Jung Jiwon & Lee Jongkwan"
+  }
+}
