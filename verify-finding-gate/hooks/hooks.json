@@ -6,12 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/closed-checks-gate.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/finding-gate.sh"
           }
-        ],
-        "env": {
-          "RECORD_FIELDS_TERMINAL_STATES": "cleared"
-        }
+        ]
       }
     ]
   }

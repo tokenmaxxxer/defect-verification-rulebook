@@ -7,7 +7,27 @@
     {
       "name": "verify",
       "source": "./verify",
-      "description": "The verify role on contract v3: adversarial reproduction of defects that coding, qa, and review all missed \u2014 independent attempts with recorded outcomes and evidence, inline findings addressed to coding, never a fix. Directive carries the four facets; gates enforce attempt/record required fields, closed_checks against code_under_review:, and the Subject: issue-<n> trailer."
+      "description": "The verify role on contract v3: adversarial reproduction of defects that coding, qa, and review all missed \u2014 independent attempts with recorded outcomes and evidence, inline findings addressed to coding, never a fix. Gates enforce closed_checks against code_under_review: and the Subject: issue-<n> trailer; the role's directive and its outcome/finding/state enforcement now live in the sibling verify-* plugins below, composed alongside this one."
+    },
+    {
+      "name": "verify-directive-depth",
+      "source": "./verify-directive-depth",
+      "description": "Owns the verify role's SessionStart directive, facet-structured (numbered steps, judgment criterion, a never line) for both the phase-1 attempt-forming facet and the phase-2 record-writing facet. No gate of its own \u2014 a directive cannot gate a write that doesn't exist yet. Supersedes verify's own former hooks/directive.sh."
+    },
+    {
+      "name": "verify-outcome-gate",
+      "source": "./verify-outcome-gate",
+      "description": "PreToolUse gate on docs/issue-<n>/reports/verify.md: enforces the three-value outcome set (reproduced | not-reproduced | blocked: needs-repro-access) and an evidence: field per attempt. Layers beside, never replaces, verify's closed-checks-gate.sh."
+    },
+    {
+      "name": "verify-finding-gate",
+      "source": "./verify-finding-gate",
+      "description": "PreToolUse gate on docs/issue-<n>/reports/verify.md: when an attempt claims outcome: reproduced, requires its paired finding block to carry verdict:, addressed_to: coding, and severity: blocking|advisory. Depends on verify-outcome-gate; presence-only, never re-derives correctness."
+    },
+    {
+      "name": "verify-state-guard",
+      "source": "./verify-state-guard",
+      "description": "State-order guard on docs/issue-<n>/reports/verify.md's loop_state (idle < reproducing < reproduced < cleared, per contract row 69): denies skip-ahead writes and a cleared write with an unresolved severity: blocking finding. Depends on verify-finding-gate."
     }
   ]
 }

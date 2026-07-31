@@ -31,5 +31,18 @@ run allow cc-sha-match    closed-checks-gate.sh "$REC" "$CC_OK"
 run deny  cc-sha-mismatch closed-checks-gate.sh "$REC" "$CC_MISMATCH"
 run deny  cc-no-field     closed-checks-gate.sh "$REC" "$CC_NOFIELD"
 
-printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
-[ "$fail" -eq 0 ]
+printf '\n== verify: %d passed, %d failed ==\n' "$pass" "$fail"
+[ "$fail" -eq 0 ] || fail_any=1
+
+# Each verify-* plugin (issue-17) is self-contained and self-tested; run its
+# own suite as a subprocess rather than re-implementing its cases here.
+fail_any="${fail_any:-0}"
+for suite in "$HERE/../verify-outcome-gate/tests/run-gate-tests.sh" \
+             "$HERE/../verify-finding-gate/tests/run-gate-tests.sh" \
+             "$HERE/../verify-state-guard/tests/run-gate-tests.sh" \
+             "$HERE/../verify-directive-depth/tests/directive-depth-test.sh"; do
+  printf '\n-- %s --\n' "$(basename "$(dirname "$(dirname "$suite")")")"
+  bash "$suite" || fail_any=1
+done
+
+exit "$fail_any"
