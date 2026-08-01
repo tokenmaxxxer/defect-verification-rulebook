@@ -41,7 +41,11 @@ else
 fi
 
 # --- substance probe: an empty verify record must be refused --------------
-probe_dir="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../verify/hooks" && pwd -P)}"
+# Contract s20 enforcement is split across the verify* plugin family (e.g.
+# verify-outcome-gate/hooks/outcome-gate.sh), not all inside verify/hooks —
+# scope the probe to the same root as the allow-scan above so a gate living
+# in a sibling plugin directory is still found.
+probe_dir="$dir"
 rec_rel="docs/issue-999/reports/verify.md"
 
 substance_probe() {

@@ -157,11 +157,105 @@ then fixed and re-confirmed with the command output quoted above.
 
 loop_state: landed
 
+## Rework (2026-08-01, re-audit spot-check) — Attempt 4
+
+**Claim tested (upstream: issue #26, 2026-08-01 re-audit comment):**
+"재인증 스팟 체크 미해소 — 계약 s20 여전히 미강제: deny-only-check가 빈
+verify record 거부 실패(exit 1 재현) — closed-checks(또는 적절한
+게이트)가 빈 record를 실제로 거부하게 수정하고 deny-only-check green
+증빙."
+
+`code_under_review: 15eeb8ee566951eba711f756a23c04470ccd233b` (`HEAD` of
+`main`/this branch at rework time — tip of the just-merged Attempt 1-3
+delivery, PR #28).
+
+**outcome: reproduced**
+
+The 2026-08-01 re-audit comment is correct: the prior record's
+"re-confirmation" for Attempt 1 (`bash tests/deny-only-check.sh .`,
+explicit `.` argument) is not what a caller who runs the script's
+documented default invocation gets. Re-derived from scratch (not cited —
+the prior record's own re-confirmation command differs from the default
+invocation, so it does not satisfy §16 for this claim):
+
+```
+$ bash tests/deny-only-check.sh
+deny-only-check: ok — no permissionDecision allow under /home/jwjung/.tokenmaxxxer/work/defect-verification-rulebook-issue-26-defect-verification
+deny-only-check: FAIL — no gate refuses an empty verify record at docs/issue-999/reports/verify.md (contract s20)
+$ echo "exit=$?"
+exit=1
+```
+
+Root cause: `tests/deny-only-check.sh`'s two probes default to two
+*different* directories. The allow-scan's `dir` defaults to the repo root
+(`tests/..`). But `substance_probe`'s `probe_dir` (line 44, pre-fix)
+independently defaulted to `.../verify/hooks` only — a leftover from
+before the s20 enforcement moved to `verify-outcome-gate/hooks/
+outcome-gate.sh` in the Attempt-1 fix. `verify/hooks` contains only
+`closed-checks-gate.sh`, which correctly stays scoped to §16
+sha-equality and allows an empty record (no `closed_checks:` block is not
+a §16 violation) — so the default (no-arg) invocation never reaches the
+gate that the Attempt-1 fix actually patched, and still exits 1.
+
+**Fix:** `tests/deny-only-check.sh:44` — `probe_dir` now defaults to
+`"$dir"` (the same resolved root the allow-scan already uses) instead of
+a separately-hardcoded `../verify/hooks`, so the substance probe finds
+every `*-gate.sh` under the checkout root, including
+`verify-outcome-gate/hooks/outcome-gate.sh`, on the default invocation.
+
+**Re-confirmation (post-fix, default invocation, no args):**
+```
+$ bash tests/deny-only-check.sh
+deny-only-check: ok — no permissionDecision allow under /home/jwjung/.tokenmaxxxer/work/defect-verification-rulebook-issue-26-defect-verification
+deny-only-check: ok — outcome-gate.sh refuses the empty record
+$ echo "exit=$?"
+exit=0
+```
+
+Full-suite regression re-run (all five gate-test suites, post-fix):
+```
+$ bash tests/run-gate-tests.sh 2>&1 | grep -E '==|FAIL'
+== verify: 11 passed, 0 failed ==
+== 14 passed, 0 failed ==
+== 18 passed, 0 failed ==
+== 21 passed, 0 failed ==
+== 8 passed, 0 failed ==
+```
+
+Re-swept the other two re-audit line items (README/install.sh repo name;
+old `<role>-agent-rulebook` naming) against the current checkout to
+confirm the prior fixes held (no regression, no re-citation of a stale
+sha since these are direct re-derivations against current HEAD):
+
+```
+$ grep -rn "verify-agent-rulebook" README.md install.sh .claude-plugin/marketplace.json */.claude-plugin/plugin.json
+(no output — clean)
+$ grep -rEn '[a-z]+-agent-rulebook' --include="*.json" --include="*.md" --include="*.sh" . | grep -v '^\./docs/'
+(no output — clean; all remaining hits are under docs/, quoting the
+historical strings in prior surveys/reports/proposals, not live code)
+```
+
+**Finding (addressed_to: coding):**
+- **verdict:** Present-but-incomplete (the prior record's claimed
+  re-confirmation used a non-default invocation and did not actually
+  exercise the caller-facing default path that the re-audit comment's
+  reproduction (`exit 1`) hit).
+- **severity: blocking** (contract s20's substance-enforcement claim was
+  certified landed while the default-path probe still failed — a
+  cert-blocking gap per issue #26's own criterion).
+- **evidence:** the exit-1 reproduction above, root-caused to
+  `tests/deny-only-check.sh:44`'s stale default `probe_dir`, fixed in this
+  same pass and re-confirmed exit 0 above.
+
+loop_state: landed (superseding the prior `landed` state — this rework
+closes the reopened gap; no further open attempt remains against the
+2026-08-01 re-audit comment).
+
 ## Open findings
 
-None. All three attempts reproduced and were resolved in this same pass;
-no unresolved `severity: blocking` finding remains open against this
-record.
+The Attempt-4 finding above is resolved in this same pass (fixed and
+re-confirmed green in this record); no `severity: blocking` finding
+remains open.
 
 ## Next steps / resolution path
 
