@@ -13,7 +13,7 @@ set -euo pipefail
 MARKET="tokenmaxxxer-verify"
 BUNDLE="verify"
 GITHUB_REPO="tokenmaxxxer/verify-agent-rulebook"
-PLUGINS=(verify)
+PLUGINS=(verify verify-finding-gate verify-outcome-gate verify-state-guard verify-directive-depth)
 
 usage() {
   cat <<'USAGE'

@@ -2,7 +2,7 @@
 # Sources core's gate-house standard (issue-72) instead of hand-rolling the
 # trap/kill-switch/JSON-parse/path-normalize/reconstruct machinery —
 # issue-20 C4. Reference only, never copied (docs/handbooks/canon-scripts.md).
-. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh"
+. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh" || { echo "finding-gate.sh: cannot source gate-lib.sh" >&2; exit 2; }
 gate_trap_fail_closed
 
 gate_kill_switch_active "${VERIFY_FINDING_GATE_OFF:-}" || { trap - EXIT; exit 0; }

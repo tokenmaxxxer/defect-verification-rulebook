@@ -16,9 +16,14 @@
 # core/hooks/tests/canon-manifest.txt so stub-check.sh catches a vendored
 # copy.
 #
-# Usage, from a gate script:
+# Usage, from a gate script. The source line MUST carry an `||` guard
+# (issue-75-confirmed defect: an unguarded source that fails when core is
+# unreachable runs no code — including no gate_* function definition —
+# after which every documented `gate_kill_switch_active ... || { exit 0; }`
+# call site reads the resulting "command not found" (127) as the kill
+# switch being off, silently allowing everything). Fail closed instead:
 #
-#   . "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}/hooks/lib/gate-lib.sh"
+#   . "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)}/hooks/lib/gate-lib.sh" || { echo "<gate-name>.sh: cannot source gate-lib.sh" >&2; exit 2; }
 #   gate_trap_fail_closed
 #   set -uo pipefail
 #   gate_kill_switch_active CORE_OFF || { trap - EXIT; exit 0; }

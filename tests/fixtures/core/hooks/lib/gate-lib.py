@@ -1,8 +1,7 @@
-# TEST FIXTURE — pinned copy of tokenmaxxxer-core's core/hooks/lib/gate-lib.py
+# Sourceable Python helper for the gate-house standard (issue-72). Loaded
 # (issue-72, main@22a7cad); see gate-lib.sh's fixture header in this same
 # directory for why this exists and what it is not.
 #
-# Sourceable Python helper for the gate-house standard (issue-72). Loaded
 # via importlib by a gate's own Python payload (never imported by dotted
 # module name — the filename carries a hyphen on purpose, matching the
 # existing core/hooks/*.sh heredoc-Python convention rather than becoming
@@ -18,6 +17,7 @@
 import json
 import os
 import posixpath
+import re
 
 
 def gate_parse_json_or_deny(raw, deny):
@@ -154,3 +154,21 @@ def gate_reconstruct_write(tool, tool_input, current_content):
         return None, False
 
     return None, False
+
+
+_BASH_WRITE_TARGET_RE = re.compile(r"[A-Za-z0-9_./~$-]+")
+
+
+def gate_bash_write_targets(command):
+    """Extract path-shaped tokens from a Bash tool_input.command string.
+
+    Python mirror of gate-lib.sh's gate_bash_write_targets (issue-75): same
+    permissive token-scan technique (not real shell parsing — approval-
+    gate.sh/board-gate.sh's approach per gate-lib.sh's own doc comment),
+    same character class as the sh version's `grep -oE
+    '[[:alnum:]_./~$-]+'`. The sh version prints one token per line to
+    stdout; this returns the equivalent list of tokens, the natural
+    per-language shape for the same data. Caller applies its own path
+    pattern to each token.
+    """
+    return _BASH_WRITE_TARGET_RE.findall(command)

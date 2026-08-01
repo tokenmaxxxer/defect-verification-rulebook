@@ -44,6 +44,17 @@ were dropped from `verify/hooks/` (issue-12): core's own `hooks.json`
 plugin install, and core's issue-66 landing added its own test coverage
 for them. This harness no longer duplicates that coverage.
 
+As of issue-23, every suite also carries one missing-core mandatory case:
+`CLAUDE_PLUGIN_ROOT_CORE` unset and no fallback `core/` directory present
+(this checkout has none at its root), asserting the `||`-guarded gate-lib
+source (core issue #75) fails closed — deny or a non-zero, informative
+exit — rather than crash-uninformatively or silently allow. `verify-state-guard`'s
+own suite gained the full mandatory-case set the other three already had
+(malformed/empty JSON, kill-switch, path variants, replace_all,
+Bash-write-target) now that `state-guard.sh` sources `gate-lib.sh` too
+(issue-23 D2), plus a `loop_state` regression case (`cleared` then
+`reproducing` again, asserting deny — issue-23 D3).
+
 `tests/stub-check.sh` (vendored verbatim from core) covers the rest of
 `verify/hooks/`'s post-transition shape: no reintroduced vendored copies of
 canon gates, and every remaining hook file parses under bash 3.2.

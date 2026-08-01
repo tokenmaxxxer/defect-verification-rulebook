@@ -6,7 +6,7 @@
 # the phase-1 survey named; the survey's claim that this gate carries no
 # kill switch was wrong — it has one, with the same pre-issue-72 fail-open
 # idiom). Reference only, never copied (docs/handbooks/canon-scripts.md).
-. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh"
+. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh" || { echo "outcome-gate.sh: cannot source gate-lib.sh" >&2; exit 2; }
 gate_trap_fail_closed
 
 gate_kill_switch_active "${VERIFY_OUTCOME_GATE_OFF:-}" || { trap - EXIT; exit 0; }
