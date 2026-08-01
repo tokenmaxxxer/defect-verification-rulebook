@@ -59,7 +59,7 @@ run allow not-reproduced-with-evidence "$REC" "$NOT_REPRODUCED"
 run allow blocked-with-evidence      "$REC" "$BLOCKED"
 run deny  invalid-outcome-value      "$REC" "$BAD_VALUE"
 run deny  reproduced-no-evidence     "$REC" "$NO_EVIDENCE"
-run allow no-outcome-field           "$REC" "$NO_OUTCOME"
+run deny  no-outcome-field            "$REC" "$NO_OUTCOME"
 run allow unrelated-path             "docs/issue-7/notes.md" "$BAD_VALUE"
 
 # Mandatory cases (issue-20 design item 5).

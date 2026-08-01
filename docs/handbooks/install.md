@@ -7,6 +7,12 @@ this repo's plugin set. Registers only the `tokenmaxxxer-verify`
 marketplace and installs only this repository's plugins — no other
 repository, no other marketplace.
 
+`GITHUB_REPO` names `tokenmaxxxer/defect-verification-rulebook` — this
+repo's actual GitHub location (per `git remote -v`), matching README's
+`Install` section. Before issue-26 both named the pre-rename
+`tokenmaxxxer/verify-agent-rulebook`, a stale string that never matched
+this repo's real remote.
+
 `PLUGINS` array names all five plugins this repo ships (as of issue-23;
 before that it named only `verify`, a 1-of-5 defect):
 `verify`, `verify-finding-gate`, `verify-outcome-gate`,

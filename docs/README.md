@@ -1,7 +1,7 @@
 # docs
 
 Documents in this repository live in one of six lifetime-based buckets,
-following the `doctrine` convention from `coding-agent-rulebook`.
+following the `doctrine` convention from `coding-rulebook`.
 
 | Directory | What lives there |
 |---|---|
