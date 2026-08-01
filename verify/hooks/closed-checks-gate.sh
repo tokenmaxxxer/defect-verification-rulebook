@@ -1,31 +1,28 @@
 #!/usr/bin/env bash
-# --- fail-closed trap: FIRST executable statement, before any set/source. Any
-# abort with a code that is neither 0 (allow) nor 2 (deny) is forced to 2 (DENY),
-# since Claude Code PreToolUse treats non-2 exits as non-blocking (fail-OPEN).
-__fc(){ rc=$?; if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then echo "fail-closed: gate aborted (rc=$rc)" >&2; exit 2; fi; }
-trap __fc EXIT
-# PreToolUse hook (Write|Edit|MultiEdit): enforces contract §16's cite-and-skip
-# sha-equality rule on writes reaching verify's own record file
-# docs/issue-<n>/reports/verify.md.
+# Sources core's gate-house standard (issue-72) instead of hand-rolling the
+# trap/JSON-parse/path-normalize/reconstruct/deny machinery — issue-20 C4.
+# Reference only, never copied (docs/handbooks/canon-scripts.md).
+. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh"
+gate_trap_fail_closed
+# PreToolUse hook (Write|Edit|MultiEdit|NotebookEdit|Bash): enforces contract
+# §16's cite-and-skip sha-equality rule on writes reaching verify's own
+# record file docs/issue-<n>/reports/verify.md.
 #
 # §16: a `closed_checks:` entry may be cited (cite-and-skip) instead of
 # re-derived ONLY when its `code_sha` equals the code sha currently under
-# review. A check closed on a different sha does not count as closed. This gate
-# reads the proposed record content, extracts every closed_checks code_sha, and
-# refuses the write if any cited sha differs from the current code sha
-# (`git rev-parse HEAD` at the project root).
+# review. A check closed on a different sha does not count as closed. This
+# gate reads the proposed record content, extracts every closed_checks
+# code_sha, and refuses the write if any cited sha differs from the current
+# code sha (named by the record's own code_under_review: field — see below).
 #
-# Peer sibling to state-gate.sh; never edits it. Reads the same proposed
-# content state-gate.sh already reads (a second field check).
+# No kill switch: this gate carries none today and issue-20 does not add
+# new surface where none exists (proposal C5).
 #
 # FAIL-CLOSED: unparseable JSON, non-dict event/tool_input, a record write
-# whose resulting content cannot be reconstructed, a closed_checks list present
-# but the current HEAD sha unobtainable, or a missing python3/git all DENY.
+# whose resulting content cannot be reconstructed (including a Bash-tool
+# write reaching the record path, which this gate cannot inspect), or a
+# closed_checks list present but naming no code_under_review: all DENY.
 set -euo pipefail
-
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# shellcheck source=/dev/null
-. "$HERE/_gate-common.sh"
 
 command -v python3 >/dev/null 2>&1 || {
   echo "verify-cycle: refused — closed-checks-gate.sh requires python3, which is not on PATH; denying rather than guessing." >&2
@@ -46,39 +43,54 @@ if isinstance(ti,dict):
     if isinstance(p,str) and p: print(p)
 ' 2>/dev/null || true)"
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=/dev/null
+. "$HERE/_gate-common.sh"
 root="$(resolve_root "$_target")"
-
-# v3: the working checkout is the role's docs branch, so HEAD is never the
-# code under review. The record itself must name it (code_under_review:).
-current_sha=""
+# C6: gate_normalize_path is deliberately non-symlink-resolving (its own
+# docstring); this gate's original behavior resolved symlinks in the
+# checkout root, so realpath the root once here to preserve that.
+if [ -n "$root" ]; then
+  root="$(cd "$root" 2>/dev/null && pwd -P || printf '%s' "$root")"
+fi
 
 _grc=0
-VG_PAYLOAD="$payload" VG_ROOT="$root" VG_SHA="$current_sha" python3 <<'PY' || _grc=$?
-import json, os, posixpath, re, sys
+VG_PAYLOAD="$payload" VG_ROOT="$root" GATE_LIB_PY="$GATE_LIB_PY" python3 <<'PY' || _grc=$?
+import importlib.util, json, os, re, sys
 
-# FAIL-CLOSED (python layer): any uncaught internal error (e.g. a ValueError
-# from os.path.realpath on a null-byte or undecodable path) must become a DENY
-# (exit 2), never an uncaught exit 1 (which Claude Code treats as non-blocking =
-# fail-open). SystemExit is not routed here, so the deliberate allow(0)/deny(2)
-# verdict paths below are preserved exactly.
-def _fail_closed(_t, _v, _tb):
-    sys.stderr.write("verify-cycle: refused — fail-closed: internal error: %s\n" % (_v,))
-    os._exit(2)
-sys.excepthook = _fail_closed
+_spec = importlib.util.spec_from_file_location("gate_lib", os.environ["GATE_LIB_PY"])
+gate_lib = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(gate_lib)
 
 def deny(m):
     sys.stderr.write("verify-cycle: refused — " + m + "\n"); sys.exit(2)
 def allow():
     sys.exit(0)
 
+def _fail_closed(_t, _v, _tb):
+    sys.stderr.write("verify-cycle: refused — fail-closed: internal error: %s\n" % (_v,))
+    os._exit(2)
+sys.excepthook = _fail_closed
+
 raw = os.environ.get("VG_PAYLOAD", "")
-try:
-    event = json.loads(raw) if raw else {}
-except ValueError:
-    deny("the tool-call payload is not valid JSON; the gate cannot judge a write it cannot parse.")
-if not isinstance(event, dict):
-    deny("the tool-call payload is not a JSON object.")
+event = gate_lib.gate_parse_json_or_deny(raw, deny)
 tool = event.get("tool_name")
+root = os.environ.get("VG_ROOT", "")
+
+REC_PATTERN = re.compile(r'^docs/issue-[0-9]+/reports/verify\.md$')
+
+if tool == "Bash":
+    ti = event.get("tool_input")
+    command = ti.get("command") if isinstance(ti, dict) else None
+    if isinstance(command, str) and root:
+        for tok in gate_lib.gate_bash_write_targets(command):
+            rel = gate_lib.gate_normalize_path(root, tok)
+            if rel is not None and REC_PATTERN.match(rel):
+                deny("a Bash command reaches %s, but this gate cannot inspect a shell command's "
+                     "effect on file content; a §16 closed_checks check cannot be verified for a "
+                     "Bash-tool write to this path, so it is refused (fail-closed)." % rel)
+    allow()
+
 ti = event.get("tool_input")
 if not isinstance(ti, dict):
     deny("tool_input is missing or not a JSON object; the gate cannot judge a write it cannot parse.")
@@ -89,18 +101,11 @@ path = ti.get("file_path") or ti.get("notebook_path")
 if not isinstance(path, str) or not path:
     allow()
 
-root = os.environ.get("VG_ROOT", "")
-n = path.replace("\\", "/")
-a = posixpath.normpath(n if posixpath.isabs(n) else (posixpath.join(root, n) if root else n))
-try:
-    resolved = posixpath.normpath(os.path.realpath(a).replace("\\", "/"))
-except OSError:
-    resolved = a
-rel = resolved[len(root):].lstrip("/") if root and (resolved == root or resolved.startswith(root + "/")) else n
-if not re.match(r'^docs/issue-[0-9]+/reports/verify\.md$', rel):
+rel = gate_lib.gate_normalize_path(root, path) if root else None
+if rel is None or not REC_PATTERN.match(rel):
     allow()
 
-# Reconstruct resulting content.
+resolved = os.path.join(root, rel) if rel else root
 current = None
 if os.path.isfile(resolved):
     try:
@@ -108,36 +113,30 @@ if os.path.isfile(resolved):
             current = fh.read(1 << 20)
     except OSError:
         current = None
-new_text = None
-if tool == "Write":
-    c = ti.get("content")
-    if isinstance(c, str):
-        new_text = c
-elif tool == "Edit":
-    o, nn = ti.get("old_string"), ti.get("new_string")
-    if isinstance(o, str) and isinstance(nn, str) and current is not None and o in current:
-        new_text = current.replace(o, nn, 1)
-elif tool == "MultiEdit":
-    edits = ti.get("edits"); t = current
-    if isinstance(edits, list) and t is not None:
-        ok = True
-        for e in edits:
-            if not isinstance(e, dict):
-                ok = False; break
-            o, nn = e.get("old_string"), e.get("new_string")
-            if not isinstance(o, str) or not isinstance(nn, str) or o not in t:
-                ok = False; break
-            t = t.replace(o, nn, 1)
-        if ok:
-            new_text = t
 
-if new_text is None:
+new_text, ok = gate_lib.gate_reconstruct_write(tool, ti, current)
+if not ok:
     deny("this write targets %s but the gate could not reconstruct the resulting content; a "
          "§16 closed_checks check cannot be verified, so it is refused (fail-closed)." % rel)
 
-# Extract every code_sha appearing under closed_checks. Heuristic: any
-# `code_sha: <value>` line. If none, there is nothing to cite-and-skip.
-cited = re.findall(r'^\s*-?\s*code_sha\s*:\s*([0-9A-Za-z]+)\s*$', new_text, re.M)
+# Extract every code_sha appearing inside a closed_checks: block only — the
+# block's own extent, from its `closed_checks:` line to the next top-level
+# field or heading, not the whole document (issue-20 design item 4: a
+# code_sha:-shaped string elsewhere, e.g. a quoted prior attempt, must not
+# be mistaken for a live citation).
+block_re = re.compile(r'^closed_checks\s*:\s*$', re.M)
+boundary_re = re.compile(r'^(?:[A-Za-z_][A-Za-z0-9_]*\s*:|#{1,6}\s)', re.M)
+
+cited = []
+for bm in block_re.finditer(new_text):
+    start = bm.end()
+    end = len(new_text)
+    bd = boundary_re.search(new_text, start)
+    if bd:
+        end = bd.start()
+    block = new_text[start:end]
+    cited.extend(re.findall(r'^\s*-?\s*code_sha\s*:\s*([0-9A-Za-z]+)\s*$', block, re.M))
+
 if not cited:
     allow()
 
@@ -163,10 +162,6 @@ if bad:
 allow()
 PY
 
-# FAIL-CLOSED (shell layer): the judge above is the allow/deny authority. Map
-# ANY terminal code that is neither 0 (allow) nor 2 (deny) to a deny — a crash
-# that aborted python (or 'set -e' propagating a bare non-2 code) must never
-# leave the guarded tool call non-blocking.
 if [ "$_grc" -ne 0 ] && [ "$_grc" -ne 2 ]; then
   echo "verify-cycle: refused — fail-closed: internal error (gate judge exited $_grc)." >&2
   exit 2
