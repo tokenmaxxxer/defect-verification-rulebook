@@ -135,5 +135,13 @@ run_raw_precreate deny finding-edit-replace-all-no-finding "$CURRENT_NOT_REPRODU
 MULTIEDIT_MIXED_JSON='{"tool_name":"MultiEdit","tool_input":{"file_path":"docs/issue-7/reports/verify.md","edits":[{"old_string":"not-reproduced","new_string":"reproduced","replace_all":false},{"old_string":"# attempt 1","new_string":"# attempt 1\nfinding:\n  verdict: Present\n  addressed_to: coding\n  severity: blocking","replace_all":true}]}}'
 run_raw_precreate allow finding-multiedit-mixed-replace-all "$CURRENT_NOT_REPRODUCED" "$MULTIEDIT_MIXED_JSON"
 
+# issue-23 D1: missing-core mandatory case.
+td_mc="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td_mc"; mkdir -p "$td_mc/docs/issue-7/reports"
+printf '{"tool_name":"Write","tool_input":{"file_path":"docs/issue-7/reports/verify.md","content":"x"},"cwd":"%s"}' "$td_mc" \
+  | env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_PROJECT_DIR="$td_mc" /bin/bash "$HOOKS/finding-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; *) got=fail-closed ;; esac
+report fail-closed "$got" finding-missing-core
+rm -rf "$td_mc"
+
 printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

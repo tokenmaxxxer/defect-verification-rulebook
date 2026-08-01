@@ -82,5 +82,13 @@ run_raw_precreate deny outcome-edit-replace-all-no-evidence "$NO_EVIDENCE" "$EDI
 MULTIEDIT_MIXED_JSON='{"tool_name":"MultiEdit","tool_input":{"file_path":"docs/issue-7/reports/verify.md","edits":[{"old_string":"outcome: pass","new_string":"outcome: reproduced","replace_all":false},{"old_string":"evidence: some evidence","new_string":"evidence: some evidence","replace_all":true}]}}'
 run_raw_precreate allow outcome-multiedit-mixed-replace-all "$BAD_VALUE" "$MULTIEDIT_MIXED_JSON"
 
+# issue-23 D1: missing-core mandatory case.
+td_mc="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td_mc"; mkdir -p "$td_mc/docs/issue-7/reports"
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"},"cwd":"%s"}' "$REC" "$td_mc" \
+  | env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_PROJECT_DIR="$td_mc" /bin/bash "$HOOKS/outcome-gate.sh" >/dev/null 2>&1
+rc=$?; case "$rc" in 0) got=allow ;; *) got=fail-closed ;; esac
+report fail-closed "$got" outcome-missing-core
+rm -rf "$td_mc"
+
 printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

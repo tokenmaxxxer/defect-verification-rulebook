@@ -77,6 +77,18 @@ unset ABS_TARGET_PREFIX
 BASH_MISMATCH_JSON='{"tool_name":"Bash","tool_input":{"command":"printf x > docs/issue-7/reports/verify.md"}}'
 run_raw deny cc-bash-write-target closed-checks-gate.sh "$BASH_MISMATCH_JSON"
 
+# issue-23 D1: missing-core mandatory case — no CLAUDE_PLUGIN_ROOT_CORE and no
+# fallback core/ directory present (this checkout has none at its root), so
+# the gate-lib.sh source guard must fail-closed (deny/non-zero), never allow.
+run_missing_core() {
+  td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"; mkdir -p "$td/docs/issue-7/reports"
+  printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"},"cwd":"%s"}' "$REC" "$td" \
+    | env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_PROJECT_DIR="$td" /bin/bash "$HOOKS/closed-checks-gate.sh" >/dev/null 2>&1
+  rc=$?; case "$rc" in 0) got=allow ;; *) got=fail-closed ;; esac
+  rm -rf "$td"; report fail-closed "$got" cc-missing-core
+}
+run_missing_core
+
 # Edit with replace_all against a multiply-occurring old_string, and a
 # MultiEdit mixing replace_all true/false in one call.
 CC_TWO_SHAS='closed_checks:

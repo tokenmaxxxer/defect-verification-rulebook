@@ -2,7 +2,7 @@
 # Sources core's gate-house standard (issue-72) instead of hand-rolling the
 # trap/JSON-parse/path-normalize/reconstruct/deny machinery — issue-20 C4.
 # Reference only, never copied (docs/handbooks/canon-scripts.md).
-. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh"
+. "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/gate-lib.sh" || { echo "closed-checks-gate.sh: cannot source gate-lib.sh" >&2; exit 2; }
 gate_trap_fail_closed
 # PreToolUse hook (Write|Edit|MultiEdit|NotebookEdit|Bash): enforces contract
 # §16's cite-and-skip sha-equality rule on writes reaching verify's own

@@ -35,5 +35,12 @@ echo "$OUT" | grep -q 'code_under_review'; report "word:code_under_review" $?
 OFF_OUT="$(CLAUDE_PLUGIN_ROOT_CORE="$CORE_FIXTURE" CLAUDE_ROLE=defect-verification DEFECT_VERIFICATION_CYCLE_OFF=1 bash "$DIRECTIVE" 2>/dev/null)"
 [ -z "$OFF_OUT" ]; report "kill-switch:empty-output" $?
 
+# issue-23 D1: missing-core mandatory case — no CLAUDE_PLUGIN_ROOT_CORE and no
+# fallback core/ directory present; the `||` source guard must fail-closed
+# (non-zero exit), never silently produce a directive as if core were there.
+env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_ROLE=defect-verification bash "$DIRECTIVE" >/dev/null 2>&1
+rc=$?
+[ "$rc" -ne 0 ]; report "missing-core:fail-closed" $?
+
 printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

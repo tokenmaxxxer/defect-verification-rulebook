@@ -48,6 +48,16 @@ while IFS= read -r f; do
     reasons+=("reconstructs Edit/MultiEdit content via its own .replace(...) call instead of gate_lib.gate_reconstruct_write — likely ignores replace_all")
   fi
 
+  # A gate that sources gate-lib.sh with no `||` fallback on the same
+  # statement is fail-open on a missing core (issue-75-confirmed): a
+  # failed source runs no code, so gate_kill_switch_active is undefined
+  # afterward, returns 127, and every documented
+  # "gate_kill_switch_active ... || { exit 0; }" call site reads that as
+  # the kill switch being off — silently allowing everything.
+  if grep -q 'gate-lib\.sh"$' "$f" && ! grep -qE 'gate-lib\.sh"[[:space:]]*\|\|' "$f"; then
+    reasons+=("sources gate-lib.sh with no || guard on the same line — fail-open when core is unreachable (missing CLAUDE_PLUGIN_ROOT_CORE)")
+  fi
+
   if [ "${#reasons[@]}" -gt 0 ]; then
     echo "compliance-check: FAIL — $f:" >&2
     for r in "${reasons[@]}"; do echo "  - $r" >&2; done
