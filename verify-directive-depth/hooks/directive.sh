@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-case "${VERIFY_DIRECTIVE_DEPTH_OFF:-}" in ""|0|false|no|off) ;; *) exit 0 ;; esac
 . "${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks/lib/role-directive.sh"
 YOU_DECIDE=$'YOU DECIDE: whether a defect exists in what was built, found by independently attempting to reproduce it — never a re-litigation of review\'s per-requirement verdict, never a holistic quality judgment, and never a fix. You prevent a defect that review\'s pass and qa\'s attempts both missed from reaching landing unchallenged.'
 USE_WHEN=$'USE WHEN (phase 1, scout protocol):\nSTEPS:\n1. Read coding\'s record, qa\'s record, and review\'s record.\n2. Enumerate candidate attempts, each naming its source verbatim: a qa defect report, a review requirement marked Present, or a self-devised path.\n3. Name code_under_review: and state which closed_checks entries will be cited (cite-and-skip) versus re-derived.\nCRITERION: an attempt list where any item has no named source is rejected as too vague to act on.\nNEVER: propose a fix; re-litigate review\'s per-requirement verdict as if it were the attempt itself.'

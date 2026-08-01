@@ -1,13 +1,16 @@
 # tokenmaxxxer / verify-agent-rulebook
 
 The `verify` role on contract v3. A verify session is spawned with two
-plugin sets installed: this marketplace's `verify` plugin, and the
+plugin sets installed: this marketplace's five `verify*` plugins, and the
 [tokenmaxxxer-core](https://github.com/tokenmaxxxer/tokenmaxxxer-core)
 plugins (`core`, `terse`, `freelunch`, `scout`). Core owns the interaction
 protocol — issue in, two-phase PR out (research/survey/proposal → human
 review Approve → execution), branch `issue-<n>/verify`, record at
 `docs/issue-<n>/reports/verify.md`. This rulebook owns only what is
-verify-specific.
+verify-specific. Core also ships the gate-house standard
+(`core/hooks/lib/gate-lib.sh`/`gate-lib.py`, issue #72): every PreToolUse
+gate below sources it by reference rather than hand-rolling the
+trap/kill-switch/JSON-parse/path-normalize/reconstruct machinery.
 
 ## What `verify` decides
 
@@ -20,25 +23,47 @@ review-record.
 
 ## What is here
 
-    verify/hooks/directive.sh           SessionStart — the four facets:
-                                        research (what survives a clean
-                                        review; what qa/review already tried),
-                                        survey (read everything), proposal
-                                        (verbatim attempt list +
-                                        code_under_review), judgment
-                                        (own-reproduction basis, record empty
-                                        attempts, evidence-or-refused,
-                                        band→blocking mapping, waiver rule)
-    verify/hooks/record-fields-gate.sh  s20 minimum content on the record
-    verify/hooks/closed-checks-gate.sh  a closed_checks cite must match the
-                                        record's code_under_review: sha —
-                                        never the working branch HEAD
-    verify/hooks/trailer-gate.sh        commits staging docs/issue-<n>/** carry
-                                        `Subject: issue-<n>`
-    verify/hooks/handbook-trigger-gate.sh  s21 same-turn handbook sync
-    verify/skills/finding-record        attempt + finding schema
-    verify/skills/severity-classification  deterministic band lookup + band→gate
-    tests/                              repo-level checks (never installed)
+Five plugins, each self-contained with its own `.claude-plugin/plugin.json`,
+`hooks/`, `tests/`, and `README.md`:
+
+    verify/                     skills only — finding-record (attempt +
+                                finding schema) and severity-classification
+                                (deterministic band lookup + band→gate) —
+                                plus closed-checks-gate.sh (PreToolUse: a
+                                closed_checks cite must match the record's
+                                code_under_review: sha — never the working
+                                branch HEAD). No kill switch.
+    verify-finding-gate/        finding-gate.sh (PreToolUse): a written
+                                outcome: reproduced must carry a paired
+                                finding block (verdict:, addressed_to:
+                                coding, severity:) inside the same attempt
+                                window, on either side of the outcome: line.
+                                Kill switch: VERIFY_FINDING_GATE_OFF
+    verify-outcome-gate/        outcome-gate.sh (PreToolUse): every
+                                outcome: is one of the three adopted values
+                                and carries an evidence: field.
+                                Kill switch: VERIFY_OUTCOME_GATE_OFF
+    verify-state-guard/         state-guard.sh + verify-state.sh: loop_state
+                                only advances forward and a `cleared` write
+                                is refused while an unresolved blocking
+                                finding exists.
+                                Kill switch: VERIFY_STATE_GUARD_OFF
+    verify-directive-depth/     directive.sh (SessionStart): sources core's
+                                role-directive with verify's YOU_DECIDE/
+                                USE_WHEN text. Kill switch is core's own
+                                per-role DEFECT_VERIFICATION_CYCLE_OFF — no
+                                local kill switch; core_role_directive owns it.
+    tests/                      repo-level checks (never installed):
+                                run-gate-tests.sh (runs every plugin's own
+                                suite as a subprocess), stub-check.sh
+                                (drift-recurrence detector against core
+                                canon), deny-only-check.sh (empty-record
+                                substance probe against every *-gate.sh),
+                                fixtures/ (pinned core gate-lib.sh/
+                                gate-lib.py/role-directive.sh + a
+                                compliance-check.sh copy, so the suite runs
+                                deterministically without a live core
+                                plugin install)
 
 ## Record vocabulary
 
@@ -53,11 +78,15 @@ keyed to `code_under_review:`.
 
     claude plugin marketplace add tokenmaxxxer/verify-agent-rulebook
     claude plugin install verify@tokenmaxxxer-verify
+    claude plugin install verify-finding-gate@tokenmaxxxer-verify
+    claude plugin install verify-outcome-gate@tokenmaxxxer-verify
+    claude plugin install verify-state-guard@tokenmaxxxer-verify
+    claude plugin install verify-directive-depth@tokenmaxxxer-verify
 
-Kill switch: `VERIFY_CYCLE_DISABLE=1`.
+Per-plugin kill switches are listed under "What is here" above.
 
 ## Run the checks
 
-    /bin/bash tests/parse-check.sh
     /bin/bash tests/run-gate-tests.sh
+    /bin/bash tests/stub-check.sh
     /bin/bash tests/deny-only-check.sh
