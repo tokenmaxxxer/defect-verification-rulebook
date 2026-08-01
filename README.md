@@ -1,4 +1,4 @@
-# tokenmaxxxer / verify-agent-rulebook
+# tokenmaxxxer / defect-verification-rulebook
 
 The `verify` role on contract v3. A verify session is spawned with two
 plugin sets installed: this marketplace's five `verify*` plugins, and the
@@ -76,7 +76,7 @@ keyed to `code_under_review:`.
 
 ## Install
 
-    claude plugin marketplace add tokenmaxxxer/verify-agent-rulebook
+    claude plugin marketplace add tokenmaxxxer/defect-verification-rulebook
     claude plugin install verify@tokenmaxxxer-verify
     claude plugin install verify-finding-gate@tokenmaxxxer-verify
     claude plugin install verify-outcome-gate@tokenmaxxxer-verify

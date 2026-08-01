@@ -24,7 +24,7 @@ never dropped on dispute, only re-rated.
 ## The shape of the classification
 
 A **deterministic table-lookup**, not an averaged subjective score, mirroring
-the practice research review-agent-rulebook already established for this
+the practice research review-rulebook already established for this
 org's use of severity: Microsoft's SDL bug bar replaced DREAD's averaged
 damage/reproducibility/exploitability/affected-users/discoverability score
 for being too subjective and inconsistently scored. This skill uses one of

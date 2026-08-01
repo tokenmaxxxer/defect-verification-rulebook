@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot installer for the tokenmaxxxer verify-agent-rulebook stack.
+# One-shot installer for the tokenmaxxxer defect-verification-rulebook stack.
 # Registers ONLY the tokenmaxxxer-verify marketplace and installs ONLY this
 # repository's plugins (verify) plus its bundle (verify).
 # Names no other repository and no other marketplace.
@@ -12,7 +12,7 @@ set -euo pipefail
 
 MARKET="tokenmaxxxer-verify"
 BUNDLE="verify"
-GITHUB_REPO="tokenmaxxxer/verify-agent-rulebook"
+GITHUB_REPO="tokenmaxxxer/defect-verification-rulebook"
 PLUGINS=(verify verify-finding-gate verify-outcome-gate verify-state-guard verify-directive-depth)
 
 usage() {

@@ -127,7 +127,9 @@ evidence_re = re.compile(r'^[ \t]*evidence[ \t]*:', re.M)
 
 outcomes = list(outcome_re.finditer(new_text))
 if not outcomes:
-    allow()
+    deny("record has no outcome: field; contract s20 requires minimum record content — a "
+         "write that reaches this record path with no outcome: field is refused, not allowed "
+         "through as an empty record.")
 
 # Heuristic for pairing an outcome occurrence with its attempt block's
 # evidence: treat the window from immediately after the previous `outcome:`
