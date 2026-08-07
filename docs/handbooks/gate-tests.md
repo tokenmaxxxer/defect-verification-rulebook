@@ -55,6 +55,23 @@ Bash-write-target) now that `state-guard.sh` sources `gate-lib.sh` too
 (issue-23 D2), plus a `loop_state` regression case (`cleared` then
 `reproducing` again, asserting deny — issue-23 D3).
 
+As of issue-30, each suite's missing-core mandatory case tightened its
+verdict classification: Claude Code's PreToolUse only blocks the tool on
+exit 2 (exit 1 merely warns and the write proceeds), so mapping "any
+nonzero" to `fail-closed` let a gate that regressed to exit 1 pass the
+test while still failing open in production. All four now split
+`0)`/`2)`/`*)` (`allow`/`deny`/`exit-$rc`), require `deny` specifically,
+and additionally assert the deny path's stderr carries the
+`cannot source gate-lib.sh` message rather than just checking the exit
+code. `verify-state-guard/hooks/verify-state.sh` (the passive, never-deny
+state writer, not a gate) also migrated its own hand-rolled kill switch
+to `gate_kill_switch_active` semantics inline (it cannot source
+`gate-lib.sh` — issue-23 C3 — because it installs independently of the
+gate plugins) and now surfaces internal failures to stderr instead of
+silencing them with `2>/dev/null || exit 0`, while still exiting 0
+unconditionally; `verify-state-guard`'s suite gained two cases covering
+both.
+
 `tests/stub-check.sh` (vendored verbatim from core) covers the rest of
 `verify/hooks/`'s post-transition shape: no reintroduced vendored copies of
 canon gates, and every remaining hook file parses under bash 3.2.

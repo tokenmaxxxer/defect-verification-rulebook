@@ -82,10 +82,17 @@ run_raw deny cc-bash-write-target closed-checks-gate.sh "$BASH_MISMATCH_JSON"
 # the gate-lib.sh source guard must fail-closed (deny/non-zero), never allow.
 run_missing_core() {
   td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"; mkdir -p "$td/docs/issue-7/reports"
+  errfile="$(mktemp)"
   printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"},"cwd":"%s"}' "$REC" "$td" \
-    | env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_PROJECT_DIR="$td" /bin/bash "$HOOKS/closed-checks-gate.sh" >/dev/null 2>&1
-  rc=$?; case "$rc" in 0) got=allow ;; *) got=fail-closed ;; esac
-  rm -rf "$td"; report fail-closed "$got" cc-missing-core
+    | env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_PROJECT_DIR="$td" /bin/bash "$HOOKS/closed-checks-gate.sh" >/dev/null 2>"$errfile"
+  rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+  report deny "$got" cc-missing-core
+  if [ "$got" = deny ] && grep -q 'cannot source gate-lib.sh' "$errfile"; then
+    pass=$((pass+1)); printf 'ok     %-34s %s\n' cc-missing-core-msg "has deny message"
+  else
+    fail=$((fail+1)); printf 'FAIL   %-34s want=%s got=%s\n' cc-missing-core-msg "deny message" "$(cat "$errfile")"
+  fi
+  rm -f "$errfile"; rm -rf "$td"
 }
 run_missing_core
 
