@@ -84,11 +84,17 @@ run_raw_precreate allow outcome-multiedit-mixed-replace-all "$BAD_VALUE" "$MULTI
 
 # issue-23 D1: missing-core mandatory case.
 td_mc="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td_mc"; mkdir -p "$td_mc/docs/issue-7/reports"
+errfile_mc="$(mktemp)"
 printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"},"cwd":"%s"}' "$REC" "$td_mc" \
-  | env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_PROJECT_DIR="$td_mc" /bin/bash "$HOOKS/outcome-gate.sh" >/dev/null 2>&1
-rc=$?; case "$rc" in 0) got=allow ;; *) got=fail-closed ;; esac
-report fail-closed "$got" outcome-missing-core
-rm -rf "$td_mc"
+  | env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_PROJECT_DIR="$td_mc" /bin/bash "$HOOKS/outcome-gate.sh" >/dev/null 2>"$errfile_mc"
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+report deny "$got" outcome-missing-core
+if [ "$got" = deny ] && grep -q 'cannot source gate-lib.sh' "$errfile_mc"; then
+  pass=$((pass+1)); printf 'ok     %-34s %s\n' outcome-missing-core-msg "has deny message"
+else
+  fail=$((fail+1)); printf 'FAIL   %-34s want=%s got=%s\n' outcome-missing-core-msg "deny message" "$(cat "$errfile_mc")"
+fi
+rm -f "$errfile_mc"; rm -rf "$td_mc"
 
 printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

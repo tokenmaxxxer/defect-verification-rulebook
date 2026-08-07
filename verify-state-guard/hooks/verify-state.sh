@@ -25,16 +25,21 @@
 #
 # Kill switch: export VERIFY_STATE_GUARD_OFF=1
 
-case "${VERIFY_STATE_GUARD_OFF:-}" in
-  ""|0|false|no|off) ;;
-  *) exit 0 ;;
+# Inline equivalent of core's gate_kill_switch_active (issue-72): an
+# unrecognized value stays ACTIVE (the fixed default); only a recognized
+# on-spelling disables. Cannot source core's gate-lib.sh here — issue-23 C3
+# forbids cross-plugin sourcing for verify-state-guard.
+vs_off_lc="$(printf '%s' "${VERIFY_STATE_GUARD_OFF:-}" | tr '[:upper:]' '[:lower:]')"
+case "$vs_off_lc" in
+  1|true|yes|on) exit 0 ;;
 esac
 
 command -v python3 >/dev/null 2>&1 || exit 0
 
 payload="$(cat 2>/dev/null || true)"
 
-VS_PAYLOAD="$payload" VS_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}" VS_CWD="${PWD:-}" python3 <<'PY' 2>/dev/null || exit 0
+vs_errfile="$(mktemp 2>/dev/null || echo /tmp/verify-state.$$.err)"
+VS_PAYLOAD="$payload" VS_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-}" VS_CWD="${PWD:-}" python3 <<'PY' 2>"$vs_errfile"
 import json, os, posixpath, re, sys
 
 RANKS = {"idle": 0, "reproducing": 1, "reproduced": 2, "cleared": 3}
@@ -197,5 +202,10 @@ if hook_event == "SessionStart" or not isinstance(ti, dict):
 else:
     do_posttooluse(event, root)
 PY
+vs_rc=$?
+if [ "$vs_rc" -ne 0 ]; then
+  echo "verify-state: internal error, state not updated: $(tail -c 500 "$vs_errfile" 2>/dev/null)" >&2
+fi
+rm -f "$vs_errfile"
 
 exit 0

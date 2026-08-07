@@ -125,11 +125,17 @@ run_raw_precreate allow state-notebook-edit "" "$NOTEBOOK_JSON" reproducing
 
 # issue-23 D1: missing-core mandatory case.
 td_mc="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td_mc"; mkdir -p "$td_mc/docs/issue-7/reports"
+errfile_mc="$(mktemp)"
 printf '{"tool_name":"Write","tool_input":{"file_path":"docs/issue-7/reports/verify.md","content":"x"},"cwd":"%s"}' "$td_mc" \
-  | env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_PROJECT_DIR="$td_mc" /bin/bash "$HOOKS/state-guard.sh" >/dev/null 2>&1
-rc=$?; case "$rc" in 0) got=allow ;; *) got=fail-closed ;; esac
-report fail-closed "$got" state-missing-core
-rm -rf "$td_mc"
+  | env -u CLAUDE_PLUGIN_ROOT_CORE CLAUDE_PROJECT_DIR="$td_mc" /bin/bash "$HOOKS/state-guard.sh" >/dev/null 2>"$errfile_mc"
+rc=$?; case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+report deny "$got" state-missing-core
+if [ "$got" = deny ] && grep -q 'cannot source gate-lib.sh' "$errfile_mc"; then
+  pass=$((pass+1)); printf 'ok     %-34s %s\n' state-missing-core-msg "has deny message"
+else
+  fail=$((fail+1)); printf 'FAIL   %-34s want=%s got=%s\n' state-missing-core-msg "deny message" "$(cat "$errfile_mc")"
+fi
+rm -f "$errfile_mc"; rm -rf "$td_mc"
 
 # --- verify-state.sh rank-tracking behavior --------------------------------
 
@@ -157,6 +163,53 @@ except Exception:
 
 run_state_bump "state-tracks-reproducing" "loop_state: reproducing" "loop_state: reproducing" "reproducing"
 run_state_bump "state-never-lowered" "loop_state: reproducing" "loop_state: idle" "reproducing"
+
+# issue-30: a typo'd VERIFY_STATE_GUARD_OFF must NOT disable the writer
+# (gate_kill_switch_active semantics: unrecognized value stays active).
+run_kill_switch_typo_stays_active() {
+  td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"; mkdir -p "$td/docs/issue-7/reports"
+  printf '%s' "loop_state: reproducing" > "$td/docs/issue-7/reports/verify.md"
+  printf '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' "$REC" "$td" \
+    | env VERIFY_STATE_GUARD_OFF=typo CLAUDE_PROJECT_DIR="$td" /bin/bash "$HOOKS/verify-state.sh" >/dev/null 2>&1
+  got="$(python3 -c '
+import json,sys
+try:
+    print(json.load(open(sys.argv[1])).get("highest_state",""))
+except Exception:
+    print("")
+' "$td/.claude/verify-state-issue-7.json" 2>/dev/null)"
+  rm -rf "$td"
+  report reproducing "$got" state-kill-switch-typo-stays-active
+}
+run_kill_switch_typo_stays_active
+
+# issue-30: a forced internal failure must still exit 0 (never blocks the
+# session) and now emits a non-empty stderr diagnostic instead of the old
+# silent `2>/dev/null || exit 0`. A fake python3 that crashes stands in for
+# "the payload script raised" without depending on a specific real bug.
+run_internal_failure_surfaces_diagnostic() {
+  td="$(cd "$(mktemp -d)" && pwd -P)"; git init -q "$td"; mkdir -p "$td/docs/issue-7/reports"
+  printf '%s' "loop_state: reproducing" > "$td/docs/issue-7/reports/verify.md"
+  bindir="$(mktemp -d)"
+  cat > "$bindir/python3" <<'FAKE'
+#!/usr/bin/env bash
+echo "boom: simulated internal error" >&2
+exit 1
+FAKE
+  chmod +x "$bindir/python3"
+  errfile="$(mktemp)"
+  printf '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' "$REC" "$td" \
+    | env PATH="$bindir:$PATH" CLAUDE_PROJECT_DIR="$td" /bin/bash "$HOOKS/verify-state.sh" >/dev/null 2>"$errfile"
+  rc=$?
+  report 0 "$rc" state-internal-failure-exit0
+  if grep -q 'verify-state: internal error' "$errfile"; then
+    pass=$((pass+1)); printf 'ok     %-34s %s\n' state-internal-failure-msg "has diagnostic"
+  else
+    fail=$((fail+1)); printf 'FAIL   %-34s want=%s got=%s\n' state-internal-failure-msg "diagnostic" "$(cat "$errfile")"
+  fi
+  rm -f "$errfile"; rm -rf "$td" "$bindir"
+}
+run_internal_failure_surfaces_diagnostic
 
 printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
