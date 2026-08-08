@@ -81,3 +81,18 @@ drift of a now-core-owned hook and was deleted outright (issue-20 C2) —
 `compliance-check.sh`, issue #72) is run manually against each plugin's
 `hooks/` dir as delivery evidence instead, not wired into this harness (it
 is not a pass/fail assertion suite the way the others are).
+
+## Marketplace spec field coverage (issue-32)
+
+The marketplace `roles/specs/defect-verification.spec.json`
+(tokenmaxxxer/on-the-record) required-field names — `verdict`,
+`repro_steps`, `evidence`, `severity`, `status`, `finding_type` — each
+appear at least once across this rulebook's methodology/handbook docs
+(`README.md`, `verify/skills/finding-record/SKILL.md`,
+`verify/skills/severity-classification/SKILL.md`), grep-per-field, per
+issue #32's acceptance check. The spec's evidence reference-resolution
+rule (`reference_resolution.checked_by`) names
+`on-the-record/hooks/role-spec-reference-guard.sh` as the marketplace gate
+that enforces it — this rulebook references that gate by name rather than
+forking its reference-resolution logic locally; nothing under
+`verify/hooks/` reimplements it.

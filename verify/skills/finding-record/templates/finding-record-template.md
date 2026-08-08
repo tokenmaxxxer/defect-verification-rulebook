@@ -20,10 +20,11 @@ second skeleton below) addressed to coding.
 attempt: <what was being tested, verbatim reference to the claim under test>
 outcome: <reproduced | not-reproduced | blocked: needs-repro-access>
 evidence: <repro steps, commit sha, run output; for not-reproduced, what was attempted; for blocked, what access/info is missing; for nondeterministic claims, run count and reproduction count>
-steps: <what was actually run/checked to attempt the reproduction>
+steps: <what was actually run/checked to attempt the reproduction> <!-- spec field name: repro_steps -->
 expected: <required only when the claim under test states an expectation — what was expected; omit otherwise>
 actual: <required only when the claim under test states an expectation — what actually happened; omit otherwise>
 ---
+<!-- status (spec field name): incident-level disposition, derived from outcome/verdict above; not a separate written field. -->
 
 <!--
 Emit this second block only when outcome above is `reproduced`, per
@@ -42,5 +43,5 @@ evidence: <file:line or hunk pointer, or reproduction transcript>
 rationale: <one line connecting the evidence to the verdict>
 spec_vs_built: <required only when verdict: Incorrect — what the spec required vs. what was built; omit otherwise>
 addressed_to: coding
-severity: <blocking | advisory>
+severity: <blocking | advisory> <!-- spec field name: finding_type -->
 ---

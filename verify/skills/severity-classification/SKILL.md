@@ -52,6 +52,19 @@ disagreement above. `blocking` vs. `advisory` is the field this contract's
 gates actually consult (§5); the chosen band scale is a tool for reaching
 that call consistently, not a contract-visible field itself.
 
+## Two distinct spec fields, not one
+
+The marketplace `roles/specs/defect-verification.spec.json` names two
+separate fields where this skill and `finding-record` together produce
+one deterministic band and one closed gate value: its `severity` field is
+the free-text deterministic band this skill computes (Chromium's five
+bands or Microsoft's four-level bug bar, above); its `finding_type` field
+is the closed `blocking|advisory` enum that `finding-record` writes onto
+the finding block and that this rulebook's gates (`verify-finding-gate`,
+`verify-outcome-gate`) actually consult. The two must not be collapsed:
+`severity` informs the `finding_type` call but is not itself the gated
+value.
+
 ## The artifact
 
 Writes a `severity` field onto the finding's existing block in
