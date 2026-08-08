@@ -65,3 +65,19 @@ with `RANKS = {"idle": 0, "reproducing": 1, "reproduced": 2, "cleared": 3}` -- t
 
 ### Expected
 Either the gate should refuse (fail-closed) on an unrecognized-but-documented loop_state value reaching a verify.md record, or the proposal should state plainly that state-guard.sh provides zero enforcement for the two new names rather than describing them as vocabulary "a record may carry alongside" the enforced four. As written, a record can jump directly from `idle` to a refusal/error state, or carry a live unresolved `severity: blocking` finding under one of these states, and the state-guard gate will not notice either way -- the monotonic/skip-ahead/unresolved-finding invariants only ever applied to the original four ranks, and the proposal's Rationale section addresses only the rank table's numeric ordering ("the rank table and gate behavior are untouched"), never the `not in RANKS` fallback that determines whether any invariant applies to a state at all.
+
+## before-landing -- stance 0: assume the gate just touched is bypassable -- find the bypass
+
+Verdict: NO FINDING
+Seed: commit 3d90bc1 on issue-32/implementation, diff from 2cf93a5 -- README.md, verify/skills/finding-record/SKILL.md, verify/skills/finding-record/templates/finding-record-template.md, verify/skills/severity-classification/SKILL.md, docs/handbooks/gate-tests.md, verify-directive-depth/hooks/directive.sh (HAND_OFF string literal only), docs/issue-32/reports/implementation.md
+cap_seconds: 180
+tier: default (size tier: >5 files touched)
+diff_stat_lines: 179 insertions(+), 7 deletions(-) across 7 files
+started_at: 2026-08-09T00:00:00Z
+ended_at: 2026-08-09T00:25:00Z
+
+Ran all four gate test suites at 3d90bc1 (verify-directive-depth/tests/directive-depth-test.sh, verify-finding-gate/tests/run-gate-tests.sh, verify-outcome-gate/tests/run-gate-tests.sh) -- all pass (8/8, 19/19, 15/15). Grepped every field name the gates actually parse (severity:, verdict:, addressed_to:, outcome:, evidence:) against the touched files: none of verify-finding-gate/hooks/finding-gate.sh, verify-outcome-gate/hooks/outcome-gate.sh, verify-state-guard, or verify/hooks/_gate-common.sh reference steps, repro_steps, status, or finding_type at all, so the new spec-vocabulary cross-reference prose cannot loosen a check those gates perform -- the aliasing is inert to gate logic (grep -n "steps\|repro" on the three gate scripts: no output).
+
+The directive.sh edit is a single added clause inside the HAND_OFF string literal (repro steps / repro_steps); verify-directive-depth's own test suite (directive-depth-test.sh) re-asserts word-count/keyword invariants on that exact string post-edit and passes, so the depth gate this file feeds is unaffected.
+
+One adjacent (but not qualifying) observation: the new template convention of appending "<!-- spec field name: ... -->" after a field's value (added to finding-record-template.md's steps: and severity: lines) would, if an agent literally copied the severity: line's trailing comment into a real docs/issue-<n>/reports/verify.md, break finding-gate.sh's exact-match regex ^\s*severity\s*:\s*(\S+)\s*$ (confirmed by direct regex test: re.search(pattern, "severity: blocking <!-- spec field name: finding_type -->", re.M) returns None). That failure mode is fail-closed (finding-gate treats severity as missing and denies), not fail-open, so it does not satisfy the bypass stance -- it is a potential false-deny/usability issue, not a weakened gate. No false-allow was reproduced from any file this commit touched.
