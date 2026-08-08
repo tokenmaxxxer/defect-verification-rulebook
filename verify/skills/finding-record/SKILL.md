@@ -70,7 +70,8 @@ attempt below the header block. Attempt fields:
    record how many times the attempt was run and how many times it
    reproduced — not a single pass/fail.
 4. **`steps`** — what was actually run or checked to attempt the
-   reproduction.
+   reproduction (the marketplace `roles/specs/defect-verification.spec.json`
+   names this same content `repro_steps`).
 5. **`expected`** / **`actual`** — required only when the claim under test
    states an expectation (mirrors the IEEE 829 Test Incident Report
    shape); omit when not applicable.
@@ -79,7 +80,26 @@ When an attempt reproduces, the accompanying `finding` block carries,
 verbatim from the contract: `requirement`, `verdict`
 (`Present|Surface|Absent|Incorrect|Unverifiable`), `evidence`, `rationale`,
 `spec_vs_built` (required only when `verdict: Incorrect`),
-`addressed_to: coding`, `severity: blocking|advisory`.
+`addressed_to: coding`, `severity: blocking|advisory` (the spec's
+separate `finding_type` field names this same
+`blocking|advisory` value — kept distinct from the deterministic
+`severity` band described in
+`verify/skills/severity-classification/SKILL.md`). The spec's `status`
+field is the incident-level free-text disposition; this rulebook's
+`outcome`/`verdict` are the per-attempt call the spec's `status` is
+derived from, not a renamed version of it.
+
+Spec field-token cross-reference table (`roles/specs/defect-verification.spec.json`
+field name -> this rulebook's field):
+
+| spec field     | this rulebook's field                                  |
+| -------------- | -------------------------------------------------------|
+| `verdict`      | `verdict` (finding block) / `outcome` (attempt block)   |
+| `repro_steps`  | `steps`                                                 |
+| `evidence`     | `evidence`                                              |
+| `severity`     | `severity` (deterministic band, see severity-classification) |
+| `status`       | incident-level disposition derived from `outcome`/`verdict` |
+| `finding_type` | the finding block's `severity: blocking\|advisory` value |
 
 Template at
 `verify-cycle/skills/finding-record/templates/finding-record-template.md`

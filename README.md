@@ -69,10 +69,23 @@ Five plugins, each self-contained with its own `.claude-plugin/plugin.json`,
 
 `loop_state`: `idle, reproducing, reproduced, cleared` (terminal:
 `cleared` — reachable only with no unresolved blocking finding or an
-explicit human waiver). Cross-role signals: per-attempt `outcome:
+explicit human waiver), plus the refusal/error states a record may carry
+alongside those four: `cannot-attempt-independent-reproduction`,
+`environment-setup-failed` — these are the
+`roles/specs/defect-verification.spec.json` (marketplace,
+tokenmaxxxer/on-the-record) `loop_state` bucket values this rulebook's
+vocabulary is a superset of. Cross-role signals: per-attempt `outcome:
 reproduced|not-reproduced` with `evidence:`, inline `finding` blocks with
 `addressed_to: coding` + `severity: blocking|advisory`, `closed_checks:`
-keyed to `code_under_review:`.
+keyed to `code_under_review:`. Spec field-token cross-references
+(`repro_steps`, `status`, `finding_type`, `verdict`): `repro_steps` names
+this rulebook's `steps` field; `finding_type` names the finding block's
+`severity: blocking|advisory` value as its own spec field, separate from
+the deterministic `severity` band; `status` is the spec's free-text
+per-incident disposition, distinct from `outcome`/`verdict` which are
+per-attempt calls; `verdict` maps to `Present|Surface|Absent|Incorrect|
+Unverifiable` on the `finding` block. See
+`verify/skills/finding-record/SKILL.md` for the full field table.
 
 ## Install
 
