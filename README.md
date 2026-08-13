@@ -64,6 +64,14 @@ Five plugins, each self-contained with its own `.claude-plugin/plugin.json`,
                                 compliance-check.sh copy, so the suite runs
                                 deterministically without a live core
                                 plugin install)
+    playbook/                   operational playbook (issue #1174): one file
+                                per decision axis — severity-band-assignment,
+                                reproduction-evidence-quality,
+                                independence-from-upstream-verdicts — each a
+                                numbered condition -> choice -> source rule
+                                set with REMOVAL-classified rules, backing
+                                the deterministic calls verify/ and
+                                verify-outcome-gate/ already gate on.
 
 ## Record vocabulary
 
