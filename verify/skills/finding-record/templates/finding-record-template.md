@@ -13,14 +13,23 @@ times it reproduced — not a single pass/fail.
 expected/actual are required only when the claim under test states an
 expectation; omit them otherwise.
 
+evidence_kind names the artifact type behind evidence (recording,
+transcript, log excerpt, diff, command output) so a reader never has to
+guess whether they hold the whole picture. environment is captured at
+attempt time (sha, run/build context), not reconstructed afterward — a
+blocked attempt still records the actual command/output attempted where
+one exists, not a bare prose note.
+
 When outcome is reproduced, also emit a separate finding block (see the
 second skeleton below) addressed to coding.
 -->
 ---
 attempt: <what was being tested, verbatim reference to the claim under test>
 outcome: <reproduced | not-reproduced | blocked: needs-repro-access>
-evidence: <repro steps, commit sha, run output; for not-reproduced, what was attempted; for blocked, what access/info is missing; for nondeterministic claims, run count and reproduction count>
-steps: <what was actually run/checked to attempt the reproduction> <!-- spec field name: repro_steps -->
+evidence: <repro steps, commit sha, run output; for not-reproduced, what was attempted; for blocked, what access/info is missing (with the actual attempted command/output where one exists); for nondeterministic claims, run count and reproduction count>
+evidence_kind: <what the evidence pointer actually is — recording | transcript | log excerpt | diff | command output — never left implicit>
+steps: <what was actually run/checked to attempt the reproduction, starting from the explicit runtime state (flag/config/fixture) it assumes> <!-- spec field name: repro_steps -->
+environment: <commit sha and run/build context captured at attempt time, not reconstructed afterward>
 expected: <required only when the claim under test states an expectation — what was expected; omit otherwise>
 actual: <required only when the claim under test states an expectation — what actually happened; omit otherwise>
 ---

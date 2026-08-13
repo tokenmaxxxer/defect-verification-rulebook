@@ -71,10 +71,24 @@ attempt below the header block. Attempt fields:
    reproduced — not a single pass/fail.
 4. **`steps`** — what was actually run or checked to attempt the
    reproduction (the marketplace `roles/specs/defect-verification.spec.json`
-   names this same content `repro_steps`).
+   names this same content `repro_steps`), stated from the explicit
+   starting runtime state (flag/config/fixture) the attempt assumes — an
+   implied starting state is not a fact a later reader can re-check.
 5. **`expected`** / **`actual`** — required only when the claim under test
    states an expectation (mirrors the IEEE 829 Test Incident Report
    shape); omit when not applicable.
+6. **`evidence_kind`** — what the `evidence` pointer actually is
+   (recording, transcript, log excerpt, diff, command output), stated
+   rather than left implicit, so a reader is never left guessing whether
+   they hold the whole picture or one fragment of it.
+7. **`environment`** — the commit sha and run/build context, captured at
+   the moment the attempt is made rather than reconstructed afterward; a
+   reconstructed environment note is a guess, a captured one is a fact the
+   evidence can be checked against on a later, moved-forward sha. A
+   `blocked: needs-repro-access` outcome still records the actual
+   command/output attempted where one exists, not a bare prose note —
+   evidence-artifact discipline governs all three outcome values, not only
+   `reproduced`.
 
 When an attempt reproduces, the accompanying `finding` block carries,
 verbatim from the contract: `requirement`, `verdict`
