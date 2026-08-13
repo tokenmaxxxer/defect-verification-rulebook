@@ -67,11 +67,13 @@ Five plugins, each self-contained with its own `.claude-plugin/plugin.json`,
     playbook/                   operational playbook (issue #1174): one file
                                 per decision axis — severity-band-assignment,
                                 reproduction-evidence-quality,
-                                independence-from-upstream-verdicts — each a
-                                numbered condition -> choice -> source rule
-                                set with REMOVAL-classified rules, backing
-                                the deterministic calls verify/ and
-                                verify-outcome-gate/ already gate on.
+                                independence-from-upstream-verdicts,
+                                evidence-artifact-completeness (issue #1199)
+                                — each a numbered condition -> choice ->
+                                source rule set with REMOVAL-classified
+                                rules, backing the deterministic calls
+                                verify/ and verify-outcome-gate/ already
+                                gate on.
 
 ## Record vocabulary
 
