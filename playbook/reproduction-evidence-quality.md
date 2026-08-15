@@ -5,7 +5,7 @@ rule_count_floor: 8
 
 # Reproduction-evidence quality for a defect attempt
 
-Research trail: bug-report/reproduction-steps best-practice literature (QA Wolf bug-report guide, Marker.io steps-to-reproduce guide, TestDevLab reproduction-matters article, Supportbench reproduction-steps standardization guide, QATestLab reproduction-steps course material). All fetched/searched this session.
+Research trail: bug-report/reproduction-steps best-practice literature (QA Wolf bug-report guide, Marker.io steps-to-reproduce guide, TestDevLab reproduction-matters article, Supportbench reproduction-steps standardization guide, QATestLab reproduction-steps course material), plus (rules 11-13, 2026-08-14) adoption-evidence survey of the Claude Code plugin/skill ecosystem's own verification tooling (Anthropic's official plugin marketplace's PR-review toolkit and a widely-installed root-cause-analysis skill). All fetched/searched this session.
 
 ## Rules
 
@@ -28,3 +28,9 @@ Research trail: bug-report/reproduction-steps best-practice literature (QA Wolf 
 9. **REMOVAL**: Stop accepting a screenshot or log excerpt with no accompanying numbered steps as sufficient evidence for a reproduced finding — visual/log evidence supplements steps, it does not substitute for them; a finding with evidence but no reconstructable path is not independently re-checkable by coding, which is the whole point of citing an evidence pointer instead of a paraphrase. source: https://www.qawolf.com/blog/what-makes-a-great-bug-report
 
 10. **REMOVAL**: Retire any repro record that lists actions taken during exploration rather than the reduced minimal path — the exploration trail (everything tried before the minimal path was found) is process, not evidence; carrying it into the finding record reintroduces the twenty-steps-instead-of-five bloat the minimal-path discipline exists to cut. source: https://www.qawolf.com/blog/what-makes-a-great-bug-report
+
+11. Judge a "Present" requirement or a green test suite by whether it exercised the claimed behavior, not by whether it executed the claimed code path — a coverage report that counts lines touched treats a path run-through-with-no-assertion the same as a path actually checked, and an attempt that only confirms the path executed (without confirming the outcome it produced) is not yet a not-reproduced verdict on the underlying claim.
+
+12. When a not-reproduced or reproduced verdict rests on more than one causal step (e.g. "the handler silently swallows the error, so the caller sees success" is two linked claims), attach evidence to each linked step individually rather than one evidence pointer for the chain's end state — a single end-state artifact can be consistent with several different causal chains, and only per-step evidence lets a reader confirm which chain actually held.
+
+13. Treat an empty or pass-through catch/rescue block, a caught-and-logged-only error, or a fallback that substitutes a default value for a failure as its own attempt category worth checking even when no qa report or review requirement names it — this class of defect produces no crash and no failing assertion by construction, so it is systematically under-represented in qa- and review-sourced candidate lists and needs to appear as a self-devised attempt on its own.
